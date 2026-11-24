@@ -1148,6 +1148,7 @@ function homeDay(){var d=lastMeetingOnOrBefore(TODAY);return d<Y0?firstMeetingFr
 function renderSafe(){var ae=document.activeElement;if(ae&&main.contains(ae)&&/INPUT|TEXTAREA|SELECT/.test(ae.tagName))return;clampDates();var y=window.scrollY;render();window.scrollTo(0,y);markPending()}
 function liveEnsure(){if(LV.loading[viewYm()])return;main.innerHTML='<p class="empty">출석부를 불러오는 중이에요…</p>';liveLoad(viewYm()).then(function(d){if(d)renderSafe()})}
 function liveStart(){
+  var draft=document.querySelector('.draft');if(draft)draft.hidden=true;   /* "시안 화면이에요" 안내는 미리보기에서만 */
   syncBadge();
   main.innerHTML='<p class="empty">출석부를 불러오는 중이에요…</p>';
   liveLoad(viewYm()).then(function(d){if(!d)return;clampDates();if(!liveReady())liveEnsure();else renderSafe();if(passed())askMyCell()});
