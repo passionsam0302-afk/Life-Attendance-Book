@@ -14,7 +14,7 @@
 <meta name="apple-mobile-web-app-title" content="생명교구">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <style>html{color-scheme:light}:root{padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
-<!-- SERVER_URL not set: sample data -->
+<script>window.SERVER_URL = "https://script.google.com/macros/s/AKfycbzfCv3EvhU8YvS55Oma-hdCyouVIZbVzhOyfekxd2iydhK8vFwRAZDtWhlE5Bd7pzdxeQ/exec";</script>
 <!-- push notifications (OneSignal). The app lives under /Life-Attendance-Book/, so the worker path and scope point there. -->
 <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
 <script>
@@ -682,7 +682,7 @@ ICON.arrow='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-wi
 var LOGO_SM=function(id){return '<svg viewBox="0 0 40 40" aria-hidden="true"><defs><linearGradient id="'+id+'" x1="0" y1="1" x2="1" y2="0"><stop offset="0" style="stop-color:var(--logo-leaf)"/><stop offset="1" style="stop-color:var(--logo-leaf-2)"/></linearGradient></defs><rect class="lg-bg" x=".5" y=".5" width="39" height="39" rx="10"/><path class="lg-st" d="M20 30.5c-.2-3.6.3-7.4-.1-10.8"/><path fill="url(#'+id+')" d="M19.8 22.3c-.7-5.7-4.6-8.8-10.9-8.3.4 6 4.4 8.9 10.9 8.3z"/><path fill="url(#'+id+')" d="M20 19.6c.4-6.4 4.5-10.2 11.2-9.8-.2 6.6-4.5 10.1-11.2 9.8z"/><path class="lg-soil" d="M13.5 31h13"/></svg>'};
 
 /* 총무단 코드: real app checks it on the server. Placeholder until the user picks one. */
-var ADMIN_CODE='staff29',ADMIN_KEY='saengmyeong-admin';
+var ADMIN_KEY='saengmyeong-admin';
 S.admin=(function(){try{return localStorage.getItem(ADMIN_KEY)==='1'}catch(e){return false}})();
 var NOTIFY_KEY='saengmyeong-notify';
 var NOTIFY=(function(){var d={att:true,notice:true};try{var v=JSON.parse(localStorage.getItem(NOTIFY_KEY)||'null');if(v){d.att=v.att!==false;d.notice=v.notice!==false}}catch(e){}return d})();
@@ -773,7 +773,7 @@ function openAdminLogin(next){
     '<div class="actions"><button type="button" class="btn" data-close>취소</button><button type="submit" class="btn primary">확인</button></div></form>');
   setTimeout(function(){var i=$('#admin-code');i&&i.focus()},60);
 }
-function adminCode(){try{return localStorage.getItem(ADMIN_KEY+'-code')||ADMIN_CODE}catch(e){return ADMIN_CODE}}
+function adminCode(){try{return localStorage.getItem(ADMIN_KEY+'-code')||''}catch(e){return ''}}
 function setAdmin(on){S.admin=on;try{if(on)localStorage.setItem(ADMIN_KEY,'1');else localStorage.removeItem(ADMIN_KEY)}catch(e){}}
 
 /* ---------- notifications: schedule + preview (real sending happens on the server) ---------- */
@@ -1011,9 +1011,15 @@ sheet.addEventListener('click',function(e){
 });
 sheet.addEventListener('submit',function(e){
   if(e.target.id==='adminform'){e.preventDefault();
-    if($('#admin-code').value.trim().toLowerCase()!==ADMIN_CODE){$('#admin-err').textContent='코드가 맞지 않아요. 다시 확인해 주세요.';$('#admin-code').select();return}
-    setAdmin(true);try{localStorage.setItem(ADMIN_KEY+'-code',$('#admin-code').value.trim().toLowerCase())}catch(err){}toast('총무단 모드를 켰어요');if(S.tab==='home')renderHome();
-    var nx=String(S.afterAdmin||'');if(nx==='new')openNoticeEditor();else if(nx==='settings')openInstall();else if(nx==='add')openAdd();else if(nx.indexOf('person:')===0)openPerson(nx.slice(7));else closeSheet();return}
+    var ac=$('#admin-code').value.trim().toLowerCase(),aerr=$('#admin-err');
+    if(!ac){aerr.textContent='총무단 코드를 입력해 주세요.';return}
+    var adminOk=function(){setAdmin(true);try{localStorage.setItem(ADMIN_KEY+'-code',ac)}catch(err){}toast('총무단 모드를 켰어요');if(S.tab==='home')renderHome();
+      var nx=String(S.afterAdmin||'');if(nx==='new')openNoticeEditor();else if(nx==='settings')openInstall();else if(nx==='add')openAdd();else if(nx.indexOf('person:')===0)openPerson(nx.slice(7));else closeSheet()};
+    if(!LIVE_URL){adminOk();return}   /* 미리보기: 아무 코드나 */
+    aerr.textContent='확인 중이에요…';
+    apiPost({a:'admin_check',code:entryCode(),admin:ac}).then(function(res){if(res&&res.ok)adminOk();else{aerr.textContent='코드가 맞지 않아요. 다시 확인해 주세요.';var i=$('#admin-code');i&&i.select()}},
+      function(){aerr.textContent='인터넷 연결을 확인해 주세요.'});
+    return}
   if(e.target.id==='noticeform'){e.preventDefault();
     var title=$('#nt-title').value.trim();if(!title){$('#nt-title').focus();return}
     var eid=e.target.getAttribute('data-id'),data={title:title,body:$('#nt-body').value.trim(),date:$('#nt-date').value||null,remind:$('#nt-remind').checked};
@@ -1098,7 +1104,7 @@ function liveDateOk(d){if(!LIVE_URL)return true;var l=LV.dates[d.slice(0,7)];ret
 function qs(o){return Object.keys(o).map(function(k){return encodeURIComponent(k)+'='+encodeURIComponent(o[k])}).join('&')}
 function apiGet(o){return fetch(LIVE_URL+'?'+qs(o)).then(function(r){return r.json()})}
 function apiPost(o){return fetch(LIVE_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(o)}).then(function(r){return r.json()})}
-function liveQueue(op){op.code=ENTRY_CODE;LV.q.push(op);saveQ();syncBadge();markPending();liveFlush()}
+function liveQueue(op){op.code=entryCode();LV.q.push(op);saveQ();syncBadge();markPending();liveFlush()}
 function liveFlush(){
   if(LV.busy||!LV.q.length)return;LV.busy=true;var op=LV.q[0];
   apiPost(op).then(function(res){
@@ -1112,8 +1118,9 @@ function liveFlush(){
 }
 function liveLoad(ym){
   if(LV.loading[ym])return LV.loading[ym];
-  var p=apiGet({a:'load',ym:ym,code:ENTRY_CODE}).then(function(res){
+  var p=apiGet({a:'load',ym:ym,code:entryCode()}).then(function(res){
     delete LV.loading[ym];
+    if(res&&res.auth){try{localStorage.removeItem(PASS_KEY)}catch(e){}gate.hidden=false;throw new Error('입장 코드를 다시 입력해 주세요')}
     if(!res||!res.ok)throw new Error((res&&res.error)||'불러오지 못했어요');
     liveApply(res.data);LV.err=0;syncBadge();return res.data;
   }).catch(function(e){delete LV.loading[ym];LV.err++;syncBadge();
@@ -1173,19 +1180,26 @@ function copyWeek(){var t=weekReport();
   function fallback(){openSheet('<h2>이번 주 요약</h2><p>아래 글을 길게 눌러 복사해 주세요.</p><textarea class="copybox" readonly rows="12">'+esc(t)+'</textarea><div class="actions"><button type="button" class="btn" data-close>닫기</button></div>')}
   try{navigator.clipboard.writeText(t).then(function(){toast('이번 주 요약을 복사했어요. 카톡에 붙여넣으세요')},fallback)}catch(e){fallback()}}
 
-/* ---------- entry code (in the real app the server checks it; here it only gates the preview) ---------- */
-var ENTRY_CODE='life29',PASS_KEY='saengmyeong-pass';
-function passed(){try{return localStorage.getItem(PASS_KEY)===ENTRY_CODE}catch(e){return false}}
-var gate=$('#gate');
+/* ---------- entry code: only the server knows the real code (the page source is public).
+   The app keeps the code the leader typed and sends it with every request. The preview accepts any code. ---------- */
+var PASS_KEY='saengmyeong-pass';
+function entryCode(){try{return localStorage.getItem(PASS_KEY)||''}catch(e){return ''}}
+function passed(){return !!entryCode()}
+var gate=$('#gate'),liveStarted=false;
+function startApp(){if(!LIVE_URL){render();return}if(liveStarted)return;liveStarted=true;liveStart()}
 if(!passed()){gate.hidden=false;setTimeout(function(){var i=$('#gate-code');i&&i.focus()},80)}
 $('#gateform').addEventListener('submit',function(e){
-  e.preventDefault();var inp=$('#gate-code'),v=inp.value.trim().toLowerCase();
-  if(v===ENTRY_CODE){try{localStorage.setItem(PASS_KEY,ENTRY_CODE)}catch(err){}gate.hidden=true;toast('환영해요. 이제 출석을 기록할 수 있어요.');if(LIVE_URL)setTimeout(function(){askMyCell()},400);return}
-  $('#gate-err').textContent=v?'코드가 맞지 않아요. 다시 확인해 주세요.':'입장 코드를 입력해 주세요.';
-  gate.classList.remove('shake');void gate.offsetWidth;gate.classList.add('shake');inp.select();
+  e.preventDefault();var inp=$('#gate-code'),v=inp.value.trim().toLowerCase(),err=$('#gate-err');
+  function bad(msg){err.textContent=msg;gate.classList.remove('shake');void gate.offsetWidth;gate.classList.add('shake');inp.select()}
+  if(!v){bad('입장 코드를 입력해 주세요.');return}
+  function ok(){try{localStorage.setItem(PASS_KEY,v)}catch(err2){}gate.hidden=true;toast('환영해요. 이제 출석을 기록할 수 있어요.');
+    if(LIVE_URL){if(liveStarted)liveLoad(viewYm()).then(function(d){if(d)renderSafe()});else startApp();setTimeout(function(){askMyCell()},600)}}
+  if(!LIVE_URL){ok();return}
+  err.textContent='확인 중이에요…';
+  apiGet({a:'ping',code:v}).then(function(res){if(res&&res.ok){err.textContent='';ok()}else bad('코드가 맞지 않아요. 다시 확인해 주세요.')},function(){bad('인터넷 연결을 확인해 주세요.')});
 });
 
-if(LIVE_URL)liveStart();else render();
+if(!LIVE_URL)render();else if(passed())startApp();else main.innerHTML='<p class="empty">입장 코드를 넣으면 출석부를 불러와요.</p>';
 })();
 </script>
 
