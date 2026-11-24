@@ -232,7 +232,8 @@ button{cursor:pointer}
 .page-h > div{flex:1;min-width:0}
 .page-h h2{margin:0;font-size:22px;font-weight:600;letter-spacing:-.025em;line-height:1.25}
 .page-h p{margin:2px 0 0;font-size:13px;color:var(--ink-3)}
-.addbtn{border:0;background:var(--leaf);color:var(--leaf-ink);border-radius:999px;padding:8px 14px;font-size:13.5px;font-weight:600;white-space:nowrap}
+.addbtn{border:0;background:var(--leaf);color:var(--leaf-ink);border-radius:999px;padding:8px 14px;font-size:13.5px;font-weight:600;white-space:nowrap;display:inline-flex;align-items:center;gap:5px}
+.addbtn svg{width:14px;height:14px}
 .month{display:flex;align-items:center;gap:6px;margin:0 0 10px}
 .month h3{margin:0;flex:1;font-size:15px;font-weight:600;text-align:center}
 .mnav{width:32px;height:32px;border-radius:50%;border:0;background:var(--surface);color:var(--ink-2);display:grid;place-items:center;padding:0}
@@ -577,6 +578,13 @@ function person(g,role,o){o=o||{};var y=1997+Math.floor(R()*8),mo=1+Math.floor(R
 [[7,'2001. 11. 24'],[23,'1999. 11. 26'],[12,'2002. 11. 23'],[51,'2003. 11. 28'],[66,'2000. 11. 22']].forEach(function(x){if(M[x[0]])M[x[0]].birth=x[1]});
 var ROLES=['셀리더','부셀리더','봉사자'];
 function syncLeaders(){GROUPS.forEach(function(g){if(g.id.charAt(0)!=='c')return;g.leader=M.filter(function(m){return m.group===g.id&&m.role==='셀리더'}).map(function(m){return m.name}).join(', ')})}
+/* list order inside a group: 셀리더 and 총무단 roles, then 부셀리더 stay on top; everyone else keeps arrival order (ord), so people added or moved in go to the bottom */
+var ordSeq=0;function numberAll(){M.forEach(function(m){if(m.ord==null)m.ord=++ordSeq})}
+function nextOrd(){numberAll();return ++ordSeq}
+function rankOf(m){var r=m.role||'';if(/부셀리더/.test(r))return 1;if(/셀리더|총무|회계|서기/.test(r))return 0;return 2}
+function orderMembers(list){numberAll();
+  var gi=function(id){for(var i=0;i<GROUPS.length;i++)if(GROUPS[i].id===id)return i;return 99};
+  return list.slice().sort(function(a,b){return gi(a.group)-gi(b.group)||rankOf(a)-rankOf(b)||a.ord-b.ord})}
 function byId(id){for(var i=0;i<M.length;i++)if(M[i].id===id)return M[i]}
 function gOf(id){for(var i=0;i<GROUPS.length;i++)if(GROUPS[i].id===id)return GROUPS[i]}
 
@@ -749,7 +757,7 @@ function openNoticeEditor(id){
 }
 function openAdminLogin(next){
   S.afterAdmin=next;
-  openSheet('<h2>총무단 확인</h2><p>일정은 총무단만 쓸 수 있어요. 총무단 코드를 입력해 주세요.</p>'+
+  openSheet('<h2>총무단 확인</h2><p>'+({'new':'일정 쓰기는','add':'새 사람 추가는'}[next]||(String(next).indexOf('person:')===0?'셀 이동은':'이 기능은'))+' 총무단만 할 수 있어요. 총무단 코드를 입력해 주세요.</p>'+
     '<form id="adminform" autocomplete="off"><div class="field"><label for="admin-code">총무단 코드</label><input id="admin-code" type="password" autocapitalize="off" autocorrect="off" spellcheck="false"></div>'+
     '<p class="err-inline" id="admin-err" role="alert"></p>'+
     '<div class="actions"><button type="button" class="btn" data-close>취소</button><button type="submit" class="btn primary">확인</button></div></form>');
@@ -807,7 +815,7 @@ function renderCheck(){
     '<div id="groups"></div>';
   renderGroups();
 }
-function groupMembers(gid){return M.filter(function(m){return m.group===gid&&(!S.q||m.name.indexOf(S.q)>-1)})}
+function groupMembers(gid){return orderMembers(M.filter(function(m){return m.group===gid&&(!S.q||m.name.indexOf(S.q)>-1)}))}
 function renderGroups(){
   var box=$('#groups');if(!box)return;var kind=kindOf(S.date),html='';
   GROUPS.forEach(function(g){if(S.group!=='all'&&g.id!==S.group)return;
@@ -863,14 +871,14 @@ function renderStats(){
 /* ---------- roster tab ---------- */
 function monthCount(m,ym){var c=0;monthDays(ym).forEach(function(d){var r=rec(d,m.id);if(r.svc)c++;if(r.cell)c++});return c}
 function renderRoster(){
-  main.innerHTML='<div class="page-h"><div><h2>명단</h2><p>'+M.length+'명, 숫자는 이번 달 출석 횟수예요</p></div><button type="button" class="addbtn" data-add>새 사람 추가</button></div>'+
+  main.innerHTML='<div class="page-h"><div><h2>명단</h2><p>'+M.length+'명, 숫자는 이번 달 출석 횟수예요</p></div><button type="button" class="addbtn" data-add>'+(S.admin?'':ICON.lock)+'새 사람 추가</button></div>'+
     '<div class="search" style="margin-top:0">'+ICON.search+'<input id="rq" type="search" placeholder="이름 찾기" value="'+esc(S.rq)+'" autocomplete="off" aria-label="이름 찾기"></div>'+
     '<div class="chips scrollx">'+chipHTML(S.rg,'rg')+'</div><div class="plist" id="plist" style="margin-top:6px"></div>';
   renderPlist();
 }
 function renderPlist(){
   var box=$('#plist');if(!box)return;var ym=TODAY.slice(0,7),mds=meetDays(ym);
-  var list=M.filter(function(m){return(S.rg==='all'||m.group===S.rg)&&(!S.rq||m.name.indexOf(S.rq)>-1)});
+  var list=orderMembers(M.filter(function(m){return(S.rg==='all'||m.group===S.rg)&&(!S.rq||m.name.indexOf(S.rq)>-1)}));
   box.innerHTML=list.length?list.map(function(m){var g=gOf(m.group);
     return '<button type="button" class="person" data-person="'+m.id+'"><span class="av'+(m.role==='새가족'?' new':'')+'">'+m.name.charAt(0)+'</span><span class="pinfo"><b>'+m.name+'</b><small>'+g.name+(m.role?', '+m.role:'')+(m.gen?', '+m.gen+'기':'')+'</small></span><span class="pright"><span class="pc">'+monthCount(m,ym)+'회</span><span class="strip" aria-hidden="true">'+mds.map(function(d){return '<i class="'+(d>TODAY?'f':attended(d,m.id)?'on':'')+'"></i>'}).join('')+'</span></span></button>'}).join('')
     :'<p class="empty">찾는 이름이 없어요. 오른쪽 위 ‘새 사람 추가’로 등록할 수 있어요.</p>';
@@ -894,8 +902,8 @@ function openPerson(id){
     '<dl class="facts"><div><dt>성별</dt><dd>'+m.gender+'</dd></div><div><dt>기수</dt><dd>'+(m.gen?m.gen+'기':'미정')+'</dd></div><div><dt>생년월일</dt><dd>'+esc(m.birth||'미입력')+'</dd></div></dl>'+
     (function(){var p=m.phone||'',dg=p.replace(/[^0-9]/g,'');
       return '<div class="phone"><div><span>연락처</span><b>'+(p?esc(p):'미입력')+'</b></div>'+(p?'<a class="pbtn" href="tel:'+dg+'">전화</a><a class="pbtn" href="sms:'+dg+'">문자</a><button type="button" class="pbtn" data-copy="'+esc(p)+'">복사</button>':'')+'</div>'})()+
-    '<div class="field"><label for="grp-'+m.id+'">소속 셀</label><select id="grp-'+m.id+'">'+GROUPS.map(function(x){return '<option value="'+x.id+'"'+(x.id===m.group?' selected':'')+'>'+x.name+(x.leader?' ('+x.leader+')':'')+'</option>'}).join('')+'</select></div>'+
-    '<p style="font-size:12.5px;color:var(--ink-3);margin-top:6px">셀을 바꿔도 지금까지의 출석 기록은 그대로 따라가요.</p>'+
+    '<div class="field"><label for="grp-'+m.id+'">소속 셀'+(S.admin?'':' <button type="button" class="linkbtn" data-unlock="'+m.id+'">총무단 코드로 바꾸기</button>')+'</label><select id="grp-'+m.id+'"'+(S.admin?'':' disabled')+'>'+GROUPS.map(function(x){return '<option value="'+x.id+'"'+(x.id===m.group?' selected':'')+'>'+x.name+(x.leader?' ('+x.leader+')':'')+'</option>'}).join('')+'</select></div>'+
+    '<p style="font-size:12.5px;color:var(--ink-3);margin-top:6px">'+(S.admin?'셀을 바꾸면 새 셀 명단 맨 아래로 가고, 지금까지의 출석 기록은 그대로 따라가요.':'셀 이동은 총무단만 할 수 있어요.')+'</p>'+
     '<div class="field"><label for="role-'+m.id+'">역할</label><input id="role-'+m.id+'" list="role-list" value="'+esc(m.role)+'" placeholder="비워두면 셀원" autocomplete="off">'+
     '<div class="rolechips">'+ROLES.map(function(r){return '<button type="button" class="chip" data-role="'+r+'" data-for="role-'+m.id+'">'+r+'</button>'}).join('')+'</div>'+
     '<datalist id="role-list">'+ROLES.concat(['선임총무','서기','새가족총무','새가족부총무','회계']).map(function(r){return '<option value="'+r+'">'}).join('')+'</datalist></div>'+
@@ -960,7 +968,7 @@ function openInstall(){
     '<h3>알림</h3><div class="setlist">'+setRow('att','출석체크 알림','금요일 오후 10:30, 주일 오후 6:00')+setRow('notice','일정 알림','날짜가 있는 일정은 하루 전 오후 8:00')+'</div>'+
     '<h3>예정된 알림</h3>'+(al.length?'<ul class="sched">'+al.map(function(x){return '<li><time>'+sd(x.d)+' ('+DOW[dowIdx(x.d)]+') '+t2k(x.t)+'</time><span>'+esc(x.what)+'</span></li>'}).join('')+'</ul>':'<p>켜진 알림이 없어요.</p>')+
     '<p class="note">알림은 앱을 홈 화면에 설치하고 "알림 허용"을 누른 휴대폰에만 와요. 아이폰은 iOS 16.4 이상이 필요해요. 알림 미리보기는 화면에서 보여주기만 해요.</p>'+
-    '<h3>총무단 모드</h3><div class="setlist"><div class="setrow"><div><b>'+(S.admin?'켜짐':'꺼짐')+'</b><small>'+(S.admin?'이 기기에서 일정을 쓰고 고칠 수 있어요':'총무단 코드를 입력하면 일정을 쓸 수 있어요')+'</small></div><button type="button" class="mini" data-admin-toggle>'+(S.admin?'끄기':'켜기')+'</button></div></div>'+
+    '<h3>총무단 모드</h3><div class="setlist"><div class="setrow"><div><b>'+(S.admin?'켜짐':'꺼짐')+'</b><small>'+(S.admin?'이 기기에서 일정 쓰기, 새 사람 추가, 셀 이동을 할 수 있어요':'총무단 코드를 입력하면 일정 쓰기, 새 사람 추가, 셀 이동을 할 수 있어요')+'</small></div><button type="button" class="mini" data-admin-toggle>'+(S.admin?'끄기':'켜기')+'</button></div></div>'+
     '<h3>아이폰에 설치</h3><ol class="steps"><li>받은 링크를 <b>Safari</b>로 열어요. 카카오톡 안에서 열렸다면 오른쪽 아래 메뉴에서 ‘다른 브라우저로 열기’를 눌러요.</li><li>화면 아래 <b>공유</b> 버튼을 눌러요.</li><li><b>홈 화면에 추가</b>를 누르면 끝이에요.</li></ol>'+
     '<h3>안드로이드에 설치</h3><ol class="steps"><li>받은 링크를 <b>Chrome</b>으로 열어요.</li><li>화면에 뜨는 <b>앱 설치</b>를 누르거나, 오른쪽 위 메뉴에서 <b>홈 화면에 추가</b>를 눌러요.</li></ol>'+
     '<div class="actions"><button type="button" class="btn primary" data-close>확인</button></div>');
@@ -973,13 +981,14 @@ sheet.addEventListener('click',function(e){
   if(t.hasAttribute('data-preview')){previewPush(t.getAttribute('data-preview'));return}
   if(t.hasAttribute('data-push-enable')){enablePush();return}
   if(t.hasAttribute('data-admin-toggle')){if(S.admin){setAdmin(false);toast('총무단 모드를 껐어요');openInstall();if(S.tab==='home')renderHome()}else openAdminLogin('settings');return}
+  if(t.hasAttribute('data-unlock')){openAdminLogin('person:'+t.getAttribute('data-unlock'));return}
   if(t.hasAttribute('data-copy')){var num=t.getAttribute('data-copy');
     try{navigator.clipboard.writeText(num).then(function(){toast('번호를 복사했어요')},function(){selNum()})}catch(err){selNum()}
     return}
   if(t.hasAttribute('data-role')){var inp=$('#'+t.getAttribute('data-for'));var r0=t.getAttribute('data-role');inp.value=inp.value.trim()===r0?'':r0;return}
-  if(t.hasAttribute('data-save')){var id=t.getAttribute('data-save'),m=byId(id),ta=$('#note-'+id),ng=$('#grp-'+id).value,moved=ng!==m.group;
+  if(t.hasAttribute('data-save')){var id=t.getAttribute('data-save'),m=byId(id),ta=$('#note-'+id),ng=S.admin?$('#grp-'+id).value:m.group,moved=ng!==m.group;
     var nr=$('#role-'+id).value.trim(),changedRole=nr!==m.role;
-    m.note=ta.value.trim();m.group=ng;m.role=nr;
+    m.note=ta.value.trim();if(moved)m.ord=nextOrd();m.group=ng;m.role=nr;
     syncLeaders();closeSheet();
     toast(moved?m.name+' 님을 '+withRo(gOf(ng).name)+' 옮겼어요':changedRole?m.name+' 님 역할을 '+(nr?withRo(nr)+' 바꿨어요':'셀원으로 바꿨어요'):m.name+' 님 정보를 저장했어요');
     if(moved||changedRole)render();return}
@@ -990,7 +999,7 @@ sheet.addEventListener('submit',function(e){
   if(e.target.id==='adminform'){e.preventDefault();
     if($('#admin-code').value.trim().toLowerCase()!==ADMIN_CODE){$('#admin-err').textContent='코드가 맞지 않아요. 다시 확인해 주세요.';$('#admin-code').select();return}
     setAdmin(true);toast('총무단 모드를 켰어요');if(S.tab==='home')renderHome();
-    if(S.afterAdmin==='new')openNoticeEditor();else if(S.afterAdmin==='settings')openInstall();else closeSheet();return}
+    var nx=String(S.afterAdmin||'');if(nx==='new')openNoticeEditor();else if(nx==='settings')openInstall();else if(nx==='add')openAdd();else if(nx.indexOf('person:')===0)openPerson(nx.slice(7));else closeSheet();return}
   if(e.target.id==='noticeform'){e.preventDefault();
     var title=$('#nt-title').value.trim();if(!title){$('#nt-title').focus();return}
     var eid=e.target.getAttribute('data-id'),data={title:title,body:$('#nt-body').value.trim(),date:$('#nt-date').value||null,remind:$('#nt-remind').checked};
@@ -1001,7 +1010,7 @@ sheet.addEventListener('submit',function(e){
   if(e.target.id!=='addform')return;e.preventDefault();
   var name=$('#add-name').value.trim();if(!name){$('#add-name').focus();return}
   var g=$('#add-group').value,gender=(sheet.querySelector('input[name="add-gender"]:checked')||{}).value||'여';
-  uid++;M.push({id:'m'+uid,name:name,group:g,role:g==='staff'?'새가족':'',gender:gender,birth:$('#add-birth').value.trim(),phone:$('#add-phone').value.trim(),gen:$('#add-gen').value.trim(),note:$('#add-note').value.trim(),p:.5});
+  var o0=nextOrd();uid++;M.push({id:'m'+uid,ord:o0,name:name,group:g,role:g==='staff'?'새가족':'',gender:gender,birth:$('#add-birth').value.trim(),phone:$('#add-phone').value.trim(),gen:$('#add-gen').value.trim(),note:$('#add-note').value.trim(),p:.5});
   closeSheet();toast(name+' 님을 '+gOf(g).name+'에 추가했어요');render();
 });
 
@@ -1046,7 +1055,7 @@ main.addEventListener('click',function(e){
   if(t.hasAttribute('data-measure')){S.smeasure=t.getAttribute('data-measure');renderStats();return}
   if(t.hasAttribute('data-rg')){S.rg=t.getAttribute('data-rg');renderRoster();return}
   if(t.hasAttribute('data-person')){openPerson(t.getAttribute('data-person'));return}
-  if(t.hasAttribute('data-add')){openAdd();return}
+  if(t.hasAttribute('data-add')){if(S.admin)openAdd();else openAdminLogin('add');return}
 });
 main.addEventListener('input',function(e){
   if(e.target.id==='q'){S.q=e.target.value.trim();renderGroups()}
@@ -1058,18 +1067,6 @@ $('#installBtn').addEventListener('click',openInstall);
 function go(tab){S.tab=tab;Array.prototype.forEach.call(document.querySelectorAll('.nav button'),function(b){if(b.getAttribute('data-tab')===tab)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')});render();window.scrollTo(0,0)}
 function render(){if(S.tab==='home')renderHome();else if(S.tab==='check')renderCheck();else if(S.tab==='stats')renderStats();else renderRoster()}
 document.querySelector('.nav').addEventListener('click',function(e){var b=e.target.closest('[data-tab]');if(b)go(b.getAttribute('data-tab'))});
-
-/* ---------- simulated edits from other phones (shows how live sync will look) ---------- */
-var ACTORS=M.filter(function(m){return (m.group==='staff'&&m.role!=='새가족')||m.role==='셀리더'}).map(function(m){return m.name});
-function remoteEdit(){
-  if(document.hidden||S.tab!=='check'||!sheet.hidden||(gate&&!gate.hidden)||Date.now()-lastOwn<5000)return;
-  var cand=M.filter(function(m){return(S.group==='all'||m.group===S.group)&&!rec(S.date,m.id).svc});if(!cand.length)return;
-  var m=cand[Math.floor(Math.random()*cand.length)],kind=kindOf(S.date),v=Math.random()<.8?'site':'online';
-  var actor=ACTORS[Math.floor(Math.random()*ACTORS.length)];if(actor===m.name)actor=ACTORS[0];
-  put(S.date,m.id,{svc:v});updateRow(m.id,true);afterChange();
-  toast(actor+' 님이 '+m.name+' 님을 '+svcText(kind,v)+'으로 기록했어요');
-}
-setTimeout(function(){remoteEdit();setInterval(remoteEdit,24000)},9000);
 
 /* ---------- entry code (in the real app the server checks it; here it only gates the preview) ---------- */
 var ENTRY_CODE='life29',PASS_KEY='saengmyeong-pass';
