@@ -695,14 +695,13 @@ var nid=3;if(LIVE_URL)NOTICES=[];
 function dayDiff(a,b){return Math.round((toD(b)-toD(a))/86400000)}
 function nextMeeting(){for(var i=0;i<8;i++){var d=addDays(TODAY,i);if(kindOf(d)!=='etc')return d}return TODAY}
 function ddayLabel(d){var n=dayDiff(TODAY,d);return n===0?'오늘':n===1?'내일':n>1?'D-'+n:'지난 일정'}
-/* order: undated notes first (newest first), then upcoming dates (soonest first), then past dates (latest first) */
+/* order: dated notices by date (soonest first, whenever they were written), then undated notes (newest first).
+   A dated notice shows through its own day and is hidden from the next day; the row stays in the 설정 sheet as a record. */
 function sortedNotices(){
-  function rank(n){return !n.date?0:n.date>=TODAY?1:2}
-  return NOTICES.slice().sort(function(a,b){
-    var ra=rank(a),rb=rank(b);if(ra!==rb)return ra-rb;
-    if(ra===0)return a.created<b.created?1:-1;
-    if(ra===1)return a.date<b.date?-1:1;
-    return a.date<b.date?1:-1})}
+  return NOTICES.filter(function(n){return !n.date||n.date>=TODAY}).sort(function(a,b){
+    if(!a.date!==!b.date)return a.date?-1:1;
+    if(a.date&&a.date!==b.date)return a.date<b.date?-1:1;
+    return (a.created||'')<(b.created||'')?1:(a.created||'')>(b.created||'')?-1:0})}
 function parseBirth(s){var p=String(s||'').match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/);return p?pad(+p[2])+'-'+pad(+p[3]):null}
 function weekBirthdays(){var ws=weekStart(TODAY),out=[];
   for(var i=0;i<7;i++){var d=addDays(ws,i),mmdd=d.slice(5);M.forEach(function(m){if(parseBirth(m.birth)===mmdd)out.push({m:m,d:d})})}
@@ -756,7 +755,7 @@ function dayCardHTML(d){
 }
 function openNoticeEditor(id){
   var n=id?NOTICES.filter(function(x){return x.id===id})[0]:{title:'',body:'',date:'',remind:true};
-  openSheet('<h2>'+(id?'일정 수정':'일정 쓰기')+'</h2><p>날짜를 넣으면 그 전날 오후 8시에 모두에게 알림이 가요.</p>'+
+  openSheet('<h2>'+(id?'일정 수정':'일정 쓰기')+'</h2><p>날짜순으로 정렬되고, 날짜가 지나면 다음 날 자동으로 내려가요. 하루 전 알림을 켜면 그 전날 오후 8시에 모두에게 알림이 가요.</p>'+
     '<form id="noticeform" data-id="'+(id||'')+'" autocomplete="off">'+
     '<div class="field"><label for="nt-title">제목</label><input id="nt-title" required maxlength="40" value="'+esc(n.title)+'" placeholder="예: 12월 교구 MT 신청 마감"></div>'+
     '<div class="field"><label for="nt-body">내용</label><textarea id="nt-body" placeholder="자세한 내용을 적어주세요">'+esc(n.body)+'</textarea></div>'+
