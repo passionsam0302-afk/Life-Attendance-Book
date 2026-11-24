@@ -14,6 +14,7 @@
 <meta name="apple-mobile-web-app-title" content="생명교구">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <style>html{color-scheme:light}:root{padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<!-- SERVER_URL not set: sample data -->
 <!-- push notifications (OneSignal). The app lives under /Life-Attendance-Book/, so the worker path and scope point there. -->
 <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
 <script>
@@ -234,6 +235,10 @@ button{cursor:pointer}
 .page-h p{margin:2px 0 0;font-size:13px;color:var(--ink-3)}
 .addbtn{border:0;background:var(--leaf);color:var(--leaf-ink);border-radius:999px;padding:8px 14px;font-size:13.5px;font-weight:600;white-space:nowrap;display:inline-flex;align-items:center;gap:5px}
 .addbtn svg{width:14px;height:14px}
+.sync.off i{background:var(--gold,#C9A227);animation:none}
+.prow.pend .who b::after{content:'';display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--gold,#C9A227);margin-left:6px;vertical-align:middle}
+.cellpick{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}.cellpick .btn small{display:block;font-size:11.5px;opacity:.75;margin-top:2px}
+.copybox{width:100%;box-sizing:border-box;border:0;background:var(--surface-2);border-radius:12px;padding:12px;font-size:14px;line-height:1.5;color:var(--ink)}
 .month{display:flex;align-items:center;gap:6px;margin:0 0 10px}
 .month h3{margin:0;flex:1;font-size:15px;font-weight:600;text-align:center}
 .mnav{width:32px;height:32px;border-radius:50%;border:0;background:var(--surface);color:var(--ink-2);display:grid;place-items:center;padding:0}
@@ -526,8 +531,11 @@ button{cursor:pointer}
 <script>
 (function(){
 "use strict";
+/* live mode: the installed app gets window.SERVER_URL (the Apps Script web app) from the build. Without it (claude.ai preview) the app shows fictional sample data. */
+var LIVE_URL=(typeof window!=='undefined'&&typeof window.SERVER_URL==='string')?window.SERVER_URL:'';
+function localToday(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
 /* ---------- dates ---------- */
-var TODAY='2026-11-24', YEAR=2026, Y0='2026-01-01', Y1='2027-10-31';
+var TODAY=LIVE_URL?localToday():'2026-11-24', YEAR=2026, Y0='2026-01-01', Y1='2027-10-31';
 var DOW='일월화수목금토';
 function pad(n){return String(n).padStart(2,'0')}
 function key(y,m,d){return y+'-'+pad(m)+'-'+pad(d)}
@@ -568,14 +576,14 @@ function person(g,role,o){o=o||{};var y=1997+Math.floor(R()*8),mo=1+Math.floor(R
     gen:g==='new'?'':String(22+Math.floor(R()*8)),phone:'010-0000-'+String(1000+Math.floor(R()*9000)),
     note:o.note!=null?o.note:(R()<.3?PRAYERS[Math.floor(R()*PRAYERS.length)]:''),p:o.p!=null?o.p:(.4+R()*.55),mainBias:R()<.25};
   M.push(p);return p}
-['선임총무','서기','새가족총무','새가족부총무','회계'].forEach(function(r){person('staff',r,{p:.95})});
+if(!LIVE_URL){['선임총무','서기','새가족총무','새가족부총무','회계'].forEach(function(r){person('staff',r,{p:.95})});
 ['지난주 처음 오심','청소년부에서 올라옴','친구 초대로 방문','이전 교회에서 옮겨 오심'].forEach(function(n){person('new','새가족',{note:n,p:.6})});
 [16,15,15,15,14,15].forEach(function(n,i){var g='c'+(i+1);for(var k=0;k<n;k++){
   var role=k===0?'셀리더':k===1?'부셀리더':(R()<.28?'봉사자':'');
   person(g,role,{p:k<2?.93:(R()<.13?.05:undefined)});}
   gOf(g).leader=M.filter(function(m){return m.group===g})[0].name;});
 /* sample birthdays in the current week so the 이번 주 생일 section has something to show */
-[[7,'2001. 11. 24'],[23,'1999. 11. 26'],[12,'2002. 11. 23'],[51,'2003. 11. 28'],[66,'2000. 11. 22']].forEach(function(x){if(M[x[0]])M[x[0]].birth=x[1]});
+[[7,'2001. 11. 24'],[23,'1999. 11. 26'],[12,'2002. 11. 23'],[51,'2003. 11. 28'],[66,'2000. 11. 22']].forEach(function(x){if(M[x[0]])M[x[0]].birth=x[1]});}
 var ROLES=['셀리더','부셀리더','봉사자'];
 function syncLeaders(){GROUPS.forEach(function(g){if(g.id.charAt(0)!=='c')return;g.leader=M.filter(function(m){return m.group===g.id&&m.role==='셀리더'}).map(function(m){return m.name}).join(', ')})}
 /* list order inside a group: 셀리더 and 총무단 roles, then 부셀리더 stay on top; everyone else keeps arrival order (ord), so people added or moved in go to the bottom */
@@ -591,11 +599,12 @@ function gOf(id){for(var i=0;i<GROUPS.length;i++)if(GROUPS[i].id===id)return GRO
 /* ---------- store: A[date][memberId] = {svc:'site'|'online'|'main', cell:true} ---------- */
 var A={};
 function rec(d,id){return (A[d]&&A[d][id])||{}}
-function put(d,id,patch){A[d]=A[d]||{};var r=A[d][id]||{};for(var k in patch){if(patch[k])r[k]=patch[k];else delete r[k]}
-  if(Object.keys(r).length)A[d][id]=r;else delete A[d][id]}
+function put(d,id,patch,fromServer){A[d]=A[d]||{};var r=A[d][id]||{};for(var k in patch){if(patch[k])r[k]=patch[k];else delete r[k]}
+  if(Object.keys(r).length)A[d][id]=r;else delete A[d][id];
+  if(LIVE_URL&&!fromServer){var op={a:'mark',date:d,name:id};if('svc' in patch)op.svc=patch.svc||null;if('cell' in patch)op.cell=!!patch.cell;liveQueue(op)}}
 function hasRec(d){return !!(A[d]&&Object.keys(A[d]).length)}
 function attended(d,id){var r=rec(d,id);return !!(r.svc||r.cell)}
-(function seed(){
+if(!LIVE_URL)(function seed(){
   for(var mo=1;mo<=12;mo++){meetDays(YEAR+'-'+pad(mo)).forEach(function(d){
     if(d>TODAY)return;var kind=kindOf(d);
     M.forEach(function(m){var r=R(),r2=R();
@@ -658,12 +667,13 @@ function boardHTML(){
     '<div class="wk"><button type="button" class="wbtn" data-week="-1" aria-label="이전 주"'+(prevOk?'':' disabled')+'>'+ICON.prev+'</button>'+
     '<div class="t"><span class="eyebrow">'+title+(thisWeek?'<span class="now">이번 주</span>':'')+'</span><b>'+dotD(ws)+' – '+dotD(we)+'</b></div>'+
     '<button type="button" class="wbtn" data-week="1" aria-label="다음 주"'+(nextOk?'':' disabled')+'>'+ICON.next+'</button>'+
-    '<button type="button" class="wbtn" data-opencal aria-label="달력에서 날짜 고르기">'+ICON.cal+'</button></div>'+
+    '<button type="button" class="wbtn" data-opencal aria-label="달력에서 날짜 고르기">'+ICON.cal+'</button><button type="button" class="wbtn" data-copyweek aria-label="이번 주 요약 복사 (카톡용)">'+ICON.copy+'</button></div>'+
     '<div class="cols">'+cols.join('')+'</div></section>';
 }
 function refreshBoard(){var b=$('.board');if(b)b.outerHTML=boardHTML()}
 
 /* ---------- home tab: dashboard, notices, birthdays ---------- */
+ICON.copy='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="8.5" y="8.5" width="11" height="11" rx="2.5"/><path d="M15.5 8.5V6.5a2 2 0 00-2-2h-7a2 2 0 00-2 2v7a2 2 0 002 2h2"/></svg>';
 ICON.pen='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg>';
 ICON.lock='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8.5 10.5V8a3.5 3.5 0 017 0v2.5"/></svg>';
 ICON.bellS='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 16.5V11a6 6 0 0112 0v5.5l1.5 2h-15z"/><path d="M10 20.5a2.2 2.2 0 004 0"/></svg>';
@@ -681,7 +691,7 @@ var NOTICES=[
   {id:'n2',title:'12월 교구 MT 신청 마감',body:'12월 5일(토) 1박 2일로 교구 MT를 가요.\n참가비 3만 원, 셀리더에게 신청해 주세요.',date:'2026-12-05',remind:true,created:'2026-11-18'},
   {id:'n3',title:'셀모임 장소 변경',body:'다음 주부터 3셀과 5셀은 교육관 4층에서 모여요.',date:null,remind:false,created:'2026-11-20'}
 ];
-var nid=3;
+var nid=3;if(LIVE_URL)NOTICES=[];
 function dayDiff(a,b){return Math.round((toD(b)-toD(a))/86400000)}
 function nextMeeting(){for(var i=0;i<8;i++){var d=addDays(TODAY,i);if(kindOf(d)!=='etc')return d}return TODAY}
 function ddayLabel(d){var n=dayDiff(TODAY,d);return n===0?'오늘':n===1?'내일':n>1?'D-'+n:'지난 일정'}
@@ -717,7 +727,7 @@ function renderHome(){
   var shown=S.allNotices?list:list.slice(0,SHOWN);
   main.innerHTML=
     '<div class="home-h"><div><p>'+md(TODAY)+' '+DOW[dowIdx(TODAY)]+'요일</p><h2>'+head+'</h2></div><button type="button" class="cta" data-gocheck>출석 체크'+ICON.arrow+'</button></div>'+
-    '<div class="hrow">'+dayCardHTML(lastMeetingOnOrBefore(TODAY))+
+    '<div class="hrow">'+dayCardHTML(LIVE_URL?homeDay():lastMeetingOnOrBefore(TODAY))+
       '<section class="bdbox" aria-labelledby="sec-bday"><div class="bdbox-in"><div class="bdbox-h"><h3 id="sec-bday">이번 주 생일</h3><span>'+(bs.length?bs.length+'명':'')+'</span></div>'+
       (bs.length?'<ol class="bdmini">'+bs.map(function(x,i){var g=gOf(x.m.group),first=i===0||bs[i-1].m.group!==x.m.group;
         var lab=g.id==='staff'?(x.m.role==='새가족'?'새가족':'총무단'):g.name;
@@ -763,6 +773,7 @@ function openAdminLogin(next){
     '<div class="actions"><button type="button" class="btn" data-close>취소</button><button type="submit" class="btn primary">확인</button></div></form>');
   setTimeout(function(){var i=$('#admin-code');i&&i.focus()},60);
 }
+function adminCode(){try{return localStorage.getItem(ADMIN_KEY+'-code')||ADMIN_CODE}catch(e){return ADMIN_CODE}}
 function setAdmin(on){S.admin=on;try{if(on)localStorage.setItem(ADMIN_KEY,'1');else localStorage.removeItem(ADMIN_KEY)}catch(e){}}
 
 /* ---------- notifications: schedule + preview (real sending happens on the server) ---------- */
@@ -862,7 +873,7 @@ function renderStats(){
   var total='<tr class="total"><th class="row" scope="row">합계</th>'+ds.map(function(d){return d>TODAY?'<td class="fut">–</td>':'<td>'+cnt(d)+'</td>'}).join('')+'</tr>';
   main.innerHTML=
     '<div class="page-h"><div><h2>현황</h2><p>시트의 ‘총 합계’ 탭과 같은 숫자예요.</p></div></div>'+
-    '<div class="month"><button type="button" class="mnav" data-mnav="-1" aria-label="이전 달"'+(S.month<='2026-01'?' disabled':'')+'>'+ICON.prev+'</button><h3>'+mLabel(S.month)+'</h3><button type="button" class="mnav" data-mnav="1" aria-label="다음 달"'+(S.month>='2027-10'?' disabled':'')+'>'+ICON.next+'</button></div>'+
+    '<div class="month"><button type="button" class="mnav" data-mnav="-1" aria-label="이전 달"'+(S.month<=Y0.slice(0,7)?' disabled':'')+'>'+ICON.prev+'</button><h3>'+mLabel(S.month)+'</h3><button type="button" class="mnav" data-mnav="1" aria-label="다음 달"'+(S.month>=Y1.slice(0,7)?' disabled':'')+'>'+ICON.next+'</button></div>'+
     '<div class="chips scrollx">'+MEASURES.map(function(x){return '<button type="button" class="chip" data-measure="'+x.k+'" aria-pressed="'+(x.k===ms.k)+'">'+x.label+'</button>'}).join('')+'</div>'+
     '<div class="avg"><b>'+(past.length?avg:'–')+'</b><span>'+(past.length?'명, '+Number(S.month.slice(5))+'월 '+ms.label+' 평균 ('+past.length+'번)':'이 달은 아직 기록이 없어요')+'</span></div>'+
     '<div class="mtx"><table><thead><tr><th class="row" scope="col">구분</th>'+ds.map(function(d){return '<th scope="col">'+sd(d)+'</th>'}).join('')+'</tr></thead><tbody>'+rows+total+'</tbody></table></div>';
@@ -929,7 +940,7 @@ function calHTML(){
   for(var b=0;b<first;b++)cells+='<span></span>';
   monthDays(ym).forEach(function(d){var k=kindOf(d),meet=k!=='etc';
     cells+='<button type="button" class="cal-d'+(meet?' meet':'')+(hasRec(d)?' rec':'')+(d===TODAY?' today':'')+(d===S.date?' sel':'')+'" data-pick="'+d+'" aria-label="'+md(d)+' '+(meet?KIND[k]:DOW[dowIdx(d)]+'요일')+'">'+Number(d.slice(8))+'<i></i></button>'});
-  return '<div class="cal-h"><button type="button" class="mnav" data-calnav="-1" aria-label="이전 달"'+(ym<='2026-01'?' disabled':'')+'>'+ICON.prev+'</button><h2>'+mLabel(ym)+'</h2><button type="button" class="mnav" data-calnav="1" aria-label="다음 달"'+(ym>='2027-10'?' disabled':'')+'>'+ICON.next+'</button></div>'+
+  return '<div class="cal-h"><button type="button" class="mnav" data-calnav="-1" aria-label="이전 달"'+(ym<=Y0.slice(0,7)?' disabled':'')+'>'+ICON.prev+'</button><h2>'+mLabel(ym)+'</h2><button type="button" class="mnav" data-calnav="1" aria-label="다음 달"'+(ym>=Y1.slice(0,7)?' disabled':'')+'>'+ICON.next+'</button></div>'+
     '<div class="cal">'+cells+'</div>'+
     '<div class="cal-legend"><span><em style="background:var(--surface-2)"></em>주일예배, 금요철야</span><span><em style="background:var(--leaf);width:7px;height:7px;border-radius:50%"></em>기록 있음</span><span><em style="box-shadow:inset 0 0 0 1.5px var(--gold)"></em>오늘</span></div>'+
     '<p style="font-size:13px;color:var(--ink-3);margin-top:10px">다른 요일을 고르면 그날은 ‘특별 모임’으로 현장, 온라인을 기록해요.</p>'+
@@ -951,7 +962,7 @@ function pushSection(){
 /* send this phone's alert choices to OneSignal as tags (att, notice = '1' or '0'); the Apps Script skips phones tagged '0' */
 function syncPushTags(){try{localStorage.setItem(NOTIFY_KEY,JSON.stringify(NOTIFY))}catch(e){}
   if(!window.OneSignalDeferred||pushPerm()!=='granted')return;
-  window.OneSignalDeferred.push(async function(OS){try{await OS.User.addTags({att:NOTIFY.att?'1':'0',notice:NOTIFY.notice?'1':'0'})}catch(e){}});}
+  window.OneSignalDeferred.push(async function(OS){try{var tg={att:NOTIFY.att?'1':'0',notice:NOTIFY.notice?'1':'0'};if(myCell())tg.cell=myCell();await OS.User.addTags(tg)}catch(e){}});}
 function enablePush(){
   if(!window.OneSignalDeferred){toast('홈 화면에 설치한 앱에서 알림을 켤 수 있어요');return}
   if(/iPhone|iPad|iPod/.test(navigator.userAgent)&&!isStandalone()){toast('아이폰은 홈 화면에 추가한 앱에서 켤 수 있어요');return}
@@ -964,8 +975,8 @@ function enablePush(){
 function openInstall(){
   var al=upcomingAlerts(4);
   openSheet('<div class="homeicon">'+LOGO_SM('lgB')+'<span>생명교구</span></div>'+
-    '<h2 style="text-align:center">알림과 앱 설치</h2>'+pushSection()+
-    '<h3>알림</h3><div class="setlist">'+setRow('att','출석체크 알림','금요일 오후 10:30, 주일 오후 6:00')+setRow('notice','일정 알림','날짜가 있는 일정은 하루 전 오후 8:00')+'</div>'+
+    '<h2 style="text-align:center">알림과 앱 설치</h2>'+pushSection()+(LIVE_URL?'<h3>내 셀</h3><div class="setlist"><div class="setrow"><div><b>'+myCellName()+'</b><small>출석체크가 안 된 셀 알림(주일 오후 8:30)이 이 셀 기준으로 와요</small></div><button type="button" class="mini" data-mycell-open>바꾸기</button></div></div>':'')+
+    '<h3>알림</h3><div class="setlist">'+setRow('att','출석체크 알림','금요일 오후 10:30, 주일 오후 6:00'+(LIVE_URL?', 내 셀이 체크 전이면 주일 오후 8:30':''))+setRow('notice','일정 알림','날짜가 있는 일정은 하루 전 오후 8:00')+'</div>'+
     '<h3>예정된 알림</h3>'+(al.length?'<ul class="sched">'+al.map(function(x){return '<li><time>'+sd(x.d)+' ('+DOW[dowIdx(x.d)]+') '+t2k(x.t)+'</time><span>'+esc(x.what)+'</span></li>'}).join('')+'</ul>':'<p>켜진 알림이 없어요.</p>')+
     '<p class="note">알림은 앱을 홈 화면에 설치하고 "알림 허용"을 누른 휴대폰에만 와요. 아이폰은 iOS 16.4 이상이 필요해요. 알림 미리보기는 화면에서 보여주기만 해요.</p>'+
     '<h3>총무단 모드</h3><div class="setlist"><div class="setrow"><div><b>'+(S.admin?'켜짐':'꺼짐')+'</b><small>'+(S.admin?'이 기기에서 일정 쓰기, 새 사람 추가, 셀 이동을 할 수 있어요':'총무단 코드를 입력하면 일정 쓰기, 새 사람 추가, 셀 이동을 할 수 있어요')+'</small></div><button type="button" class="mini" data-admin-toggle>'+(S.admin?'끄기':'켜기')+'</button></div></div>'+
@@ -981,6 +992,8 @@ sheet.addEventListener('click',function(e){
   if(t.hasAttribute('data-preview')){previewPush(t.getAttribute('data-preview'));return}
   if(t.hasAttribute('data-push-enable')){enablePush();return}
   if(t.hasAttribute('data-admin-toggle')){if(S.admin){setAdmin(false);toast('총무단 모드를 껐어요');openInstall();if(S.tab==='home')renderHome()}else openAdminLogin('settings');return}
+  if(t.hasAttribute('data-mycell')){try{localStorage.setItem(CELL_KEY,t.getAttribute('data-mycell'))}catch(err){}syncPushTags();closeSheet();toast('내 셀을 '+withRo(myCellName())+' 정했어요');return}
+  if(t.hasAttribute('data-mycell-open')){askMyCell(true);return}
   if(t.hasAttribute('data-unlock')){openAdminLogin('person:'+t.getAttribute('data-unlock'));return}
   if(t.hasAttribute('data-copy')){var num=t.getAttribute('data-copy');
     try{navigator.clipboard.writeText(num).then(function(){toast('번호를 복사했어요')},function(){selNum()})}catch(err){selNum()}
@@ -988,7 +1001,8 @@ sheet.addEventListener('click',function(e){
   if(t.hasAttribute('data-role')){var inp=$('#'+t.getAttribute('data-for'));var r0=t.getAttribute('data-role');inp.value=inp.value.trim()===r0?'':r0;return}
   if(t.hasAttribute('data-save')){var id=t.getAttribute('data-save'),m=byId(id),ta=$('#note-'+id),ng=S.admin?$('#grp-'+id).value:m.group,moved=ng!==m.group;
     var nr=$('#role-'+id).value.trim(),changedRole=nr!==m.role;
-    m.note=ta.value.trim();if(moved)m.ord=nextOrd();m.group=ng;m.role=nr;
+    var nn=ta.value.trim();if(LIVE_URL){if(nn!==(m.note||''))liveQueue({a:'note',ym:S.date.slice(0,7),name:m.name,note:nn});if(changedRole)liveQueue({a:'role',name:m.name,role:nr});if(moved)liveQueue({a:'move',name:m.name,to:ng,admin:adminCode()})}
+    m.note=nn;if(moved)m.ord=nextOrd();m.group=ng;m.role=nr;
     syncLeaders();closeSheet();
     toast(moved?m.name+' 님을 '+withRo(gOf(ng).name)+' 옮겼어요':changedRole?m.name+' 님 역할을 '+(nr?withRo(nr)+' 바꿨어요':'셀원으로 바꿨어요'):m.name+' 님 정보를 저장했어요');
     if(moved||changedRole)render();return}
@@ -998,19 +1012,21 @@ sheet.addEventListener('click',function(e){
 sheet.addEventListener('submit',function(e){
   if(e.target.id==='adminform'){e.preventDefault();
     if($('#admin-code').value.trim().toLowerCase()!==ADMIN_CODE){$('#admin-err').textContent='코드가 맞지 않아요. 다시 확인해 주세요.';$('#admin-code').select();return}
-    setAdmin(true);toast('총무단 모드를 켰어요');if(S.tab==='home')renderHome();
+    setAdmin(true);try{localStorage.setItem(ADMIN_KEY+'-code',$('#admin-code').value.trim().toLowerCase())}catch(err){}toast('총무단 모드를 켰어요');if(S.tab==='home')renderHome();
     var nx=String(S.afterAdmin||'');if(nx==='new')openNoticeEditor();else if(nx==='settings')openInstall();else if(nx==='add')openAdd();else if(nx.indexOf('person:')===0)openPerson(nx.slice(7));else closeSheet();return}
   if(e.target.id==='noticeform'){e.preventDefault();
     var title=$('#nt-title').value.trim();if(!title){$('#nt-title').focus();return}
     var eid=e.target.getAttribute('data-id'),data={title:title,body:$('#nt-body').value.trim(),date:$('#nt-date').value||null,remind:$('#nt-remind').checked};
-    if(eid){var n=NOTICES.filter(function(x){return x.id===eid})[0];for(var k in data)n[k]=data[k];toast('일정을 고쳤어요')}
-    else{nid++;data.id='n'+nid;data.created=TODAY;NOTICES.push(data);S.openNotice=data.id;
+    if(eid){var n=NOTICES.filter(function(x){return x.id===eid})[0];for(var k in data)n[k]=data[k];toast('일정을 고쳤어요');if(LIVE_URL)liveQueue(Object.assign({a:'notice_save',admin:adminCode()},n))}
+    else{nid++;data.id=LIVE_URL?'n'+Date.now():'n'+nid;data.created=TODAY;NOTICES.push(data);S.openNotice=data.id;if(LIVE_URL)liveQueue(Object.assign({a:'notice_save',admin:adminCode()},data));
       toast(data.date&&data.remind?'일정을 올렸어요. '+sd(addDays(data.date,-1))+' 오후 8시에 알림이 가요':'일정을 올렸어요')}
     closeSheet();if(S.tab==='home')renderHome();return}
   if(e.target.id!=='addform')return;e.preventDefault();
   var name=$('#add-name').value.trim();if(!name){$('#add-name').focus();return}
   var g=$('#add-group').value,gender=(sheet.querySelector('input[name="add-gender"]:checked')||{}).value||'여';
-  var o0=nextOrd();uid++;M.push({id:'m'+uid,ord:o0,name:name,group:g,role:g==='staff'?'새가족':'',gender:gender,birth:$('#add-birth').value.trim(),phone:$('#add-phone').value.trim(),gen:$('#add-gen').value.trim(),note:$('#add-note').value.trim(),p:.5});
+  if(LIVE_URL&&byId(name)){toast(name+' 님은 이미 명단에 있어요');return}
+  if(LIVE_URL)liveQueue({a:'add',name:name,group:g,gender:gender,birth:$('#add-birth').value.trim(),phone:$('#add-phone').value.trim(),gen:$('#add-gen').value.trim(),note:$('#add-note').value.trim(),admin:adminCode()});
+  var o0=nextOrd();uid++;M.push({id:LIVE_URL?name:'m'+uid,ord:o0,name:name,group:g,role:g==='staff'?'새가족':'',gender:gender,birth:$('#add-birth').value.trim(),phone:$('#add-phone').value.trim(),gen:$('#add-gen').value.trim(),note:$('#add-note').value.trim(),p:.5});
   closeSheet();toast(name+' 님을 '+gOf(g).name+'에 추가했어요');render();
 });
 
@@ -1023,6 +1039,7 @@ function toast(msg,undo){var t=$('#toast');t.innerHTML='<span>'+msg+'</span>'+(u
 /* ---------- interactions ---------- */
 main.addEventListener('click',function(e){
   var t=e.target.closest('button');if(!t||t.disabled)return;
+  if((t.hasAttribute('data-svc')||t.hasAttribute('data-cell')||t.hasAttribute('data-allcell'))&&!liveDateOk(S.date)){toast('이 날짜는 출석부에 칸이 없어요. 금요철야와 주일예배만 기록할 수 있어요');return}
   if(t.hasAttribute('data-svc')){
     var id=t.getAttribute('data-id'),v=t.getAttribute('data-svc'),cur=rec(S.date,id).svc;
     put(S.date,id,{svc:cur===v?null:v});lastOwn=Date.now();updateRow(id);afterChange();return}
@@ -1040,7 +1057,7 @@ main.addEventListener('click',function(e){
   if(t.hasAttribute('data-newnotice')){if(S.admin)openNoticeEditor();else openAdminLogin('new');return}
   if(t.hasAttribute('data-editnotice')){openNoticeEditor(t.getAttribute('data-editnotice'));return}
   if(t.hasAttribute('data-delnotice')){var di=t.getAttribute('data-delnotice');
-    if(S.delArm===di){NOTICES=NOTICES.filter(function(x){return x.id!==di});S.delArm=null;S.openNotice=null;toast('일정을 삭제했어요')}else S.delArm=di;
+    if(S.delArm===di){NOTICES=NOTICES.filter(function(x){return x.id!==di});if(LIVE_URL)liveQueue({a:'notice_del',id:di,admin:adminCode()});S.delArm=null;S.openNotice=null;toast('일정을 삭제했어요')}else S.delArm=di;
     renderHome();return}
   if(t.hasAttribute('data-gocheck')){var nm0=nextMeeting();if(nm0===TODAY)S.date=TODAY;go('check');return}
   if(t.hasAttribute('data-date')){var nd0=t.getAttribute('data-date');if(S.tab==='home'){S.date=nd0;go('check');return}
@@ -1051,10 +1068,12 @@ main.addEventListener('click',function(e){
     S.date=pastC.length?pastC[pastC.length-1]:cand[0];render();return}
   if(t.hasAttribute('data-opencal')){openCal();return}
   if(t.hasAttribute('data-g')){S.group=t.getAttribute('data-g');renderCheck();return}
-  if(t.hasAttribute('data-mnav')){var nm=shiftMonth(S.month,Number(t.getAttribute('data-mnav')));if(nm<'2026-01'||nm>'2027-10')return;S.month=nm;renderStats();return}
+  if(t.hasAttribute('data-mnav')){var nm=shiftMonth(S.month,Number(t.getAttribute('data-mnav')));if(nm<Y0.slice(0,7)||nm>Y1.slice(0,7))return;S.month=nm;render();return}
   if(t.hasAttribute('data-measure')){S.smeasure=t.getAttribute('data-measure');renderStats();return}
   if(t.hasAttribute('data-rg')){S.rg=t.getAttribute('data-rg');renderRoster();return}
   if(t.hasAttribute('data-person')){openPerson(t.getAttribute('data-person'));return}
+  if(t.hasAttribute('data-retry')){liveEnsure();return}
+  if(t.hasAttribute('data-copyweek')){copyWeek();return}
   if(t.hasAttribute('data-add')){if(S.admin)openAdd();else openAdminLogin('add');return}
 });
 main.addEventListener('input',function(e){
@@ -1065,8 +1084,94 @@ $('#installBtn').addEventListener('click',openInstall);
 
 /* ---------- tabs ---------- */
 function go(tab){S.tab=tab;Array.prototype.forEach.call(document.querySelectorAll('.nav button'),function(b){if(b.getAttribute('data-tab')===tab)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')});render();window.scrollTo(0,0)}
-function render(){if(S.tab==='home')renderHome();else if(S.tab==='check')renderCheck();else if(S.tab==='stats')renderStats();else renderRoster()}
+function render(){if(LIVE_URL&&!liveReady()){liveEnsure();return}if(S.tab==='home')renderHome();else if(S.tab==='check')renderCheck();else if(S.tab==='stats')renderStats();else renderRoster()}
 document.querySelector('.nav').addEventListener('click',function(e){var b=e.target.closest('[data-tab]');if(b)go(b.getAttribute('data-tab'))});
+
+/* ---------- live: load from the sheet, save queue (works offline), my cell ---------- */
+var LV={loaded:{},loading:{},dates:{},months:[],busy:false,q:[],err:0};
+var Q_KEY='saengmyeong-queue',CELL_KEY='saengmyeong-mycell';
+try{LV.q=JSON.parse(localStorage.getItem(Q_KEY)||'[]')||[]}catch(e){LV.q=[]}
+function saveQ(){try{localStorage.setItem(Q_KEY,JSON.stringify(LV.q))}catch(e){}}
+function viewYm(){return S.tab==='stats'?S.month:S.date.slice(0,7)}
+function liveReady(){return !!LV.loaded[viewYm()]}
+function liveDateOk(d){if(!LIVE_URL)return true;var l=LV.dates[d.slice(0,7)];return !!(l&&l.indexOf(d)>=0)}
+function qs(o){return Object.keys(o).map(function(k){return encodeURIComponent(k)+'='+encodeURIComponent(o[k])}).join('&')}
+function apiGet(o){return fetch(LIVE_URL+'?'+qs(o)).then(function(r){return r.json()})}
+function apiPost(o){return fetch(LIVE_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(o)}).then(function(r){return r.json()})}
+function liveQueue(op){op.code=ENTRY_CODE;LV.q.push(op);saveQ();syncBadge();markPending();liveFlush()}
+function liveFlush(){
+  if(LV.busy||!LV.q.length)return;LV.busy=true;var op=LV.q[0];
+  apiPost(op).then(function(res){
+    LV.busy=false;
+    if(res&&res.busy){setTimeout(liveFlush,2500);return}
+    LV.err=0;LV.q.shift();saveQ();
+    if(!res||!res.ok){toast((res&&res.error)||'저장하지 못했어요');if(res&&res.admin)setAdmin(false);liveLoad(viewYm()).then(renderSafe)}
+    else if(/^(add|move|role)$/.test(op.a))liveLoad(viewYm()).then(renderSafe);
+    syncBadge();markPending();liveFlush();
+  },function(){LV.busy=false;LV.err++;syncBadge();setTimeout(liveFlush,Math.min(30000,2000*LV.err))});
+}
+function liveLoad(ym){
+  if(LV.loading[ym])return LV.loading[ym];
+  var p=apiGet({a:'load',ym:ym,code:ENTRY_CODE}).then(function(res){
+    delete LV.loading[ym];
+    if(!res||!res.ok)throw new Error((res&&res.error)||'불러오지 못했어요');
+    liveApply(res.data);LV.err=0;syncBadge();return res.data;
+  }).catch(function(e){delete LV.loading[ym];LV.err++;syncBadge();
+    if(!LV.loaded[viewYm()])main.innerHTML='<div class="empty"><p>출석부를 불러오지 못했어요. 인터넷 연결을 확인해 주세요.</p><p style="font-size:12.5px">'+esc(e.message||'')+'</p><button type="button" class="btn" data-retry>다시 시도</button></div>'});
+  LV.loading[ym]=p;return p;
+}
+function liveApply(d){
+  if(d.today)TODAY=d.today;
+  if(d.months&&d.months.length){LV.months=d.months;Y0=d.months[0]+'-01';var lm=d.months[d.months.length-1].split('-').map(Number);Y1=lm[0]+'-'+pad(lm[1])+'-'+pad(new Date(lm[0],lm[1],0).getDate())}
+  LV.dates[d.ym]=d.dates||[];
+  if(d.ym===viewYm()||!M.length){
+    M.length=0;(d.members||[]).forEach(function(x,i){M.push({id:x.id,name:x.name,group:x.group,section:x.section,role:x.role||'',gender:x.gender||'',birth:x.birth||'',phone:x.phone||'',gen:x.gen||'',note:x.note||'',comment:x.comment||'',ord:i+1})});
+    ordSeq=M.length;
+    (d.groups||[]).forEach(function(g){var G=gOf(g.id);if(G)G.leader=g.leader||''});
+  }
+  Object.keys(A).forEach(function(k){if(k.slice(0,7)===d.ym)delete A[k]});
+  Object.keys(d.att||{}).forEach(function(dt){Object.keys(d.att[dt]).forEach(function(n){A[dt]=A[dt]||{};A[dt][n]=d.att[dt][n]})});
+  LV.q.forEach(function(op){if(op.a==='mark'&&op.date.slice(0,7)===d.ym){var p={};if('svc' in op)p.svc=op.svc;if('cell' in op)p.cell=op.cell;put(op.date,op.name,p,true)}});
+  NOTICES=d.notices||[];
+  LV.loaded[d.ym]=Date.now();
+}
+function firstMeetingFrom(k){var d=k;for(var i=0;i<14;i++){if(kindOf(d)!=='etc')return d;d=addDays(d,1)}return k}
+function clampDates(){if(S.date<Y0)S.date=firstMeetingFrom(Y0);if(S.date>Y1)S.date=lastMeetingOnOrBefore(Y1);if(S.month<Y0.slice(0,7))S.month=Y0.slice(0,7);if(S.month>Y1.slice(0,7))S.month=Y1.slice(0,7)}
+function homeDay(){var d=lastMeetingOnOrBefore(TODAY);return d<Y0?firstMeetingFrom(Y0):d}
+function renderSafe(){var ae=document.activeElement;if(ae&&main.contains(ae)&&/INPUT|TEXTAREA|SELECT/.test(ae.tagName))return;clampDates();var y=window.scrollY;render();window.scrollTo(0,y);markPending()}
+function liveEnsure(){if(LV.loading[viewYm()])return;main.innerHTML='<p class="empty">출석부를 불러오는 중이에요…</p>';liveLoad(viewYm()).then(function(d){if(d)renderSafe()})}
+function liveStart(){
+  syncBadge();
+  main.innerHTML='<p class="empty">출석부를 불러오는 중이에요…</p>';
+  liveLoad(viewYm()).then(function(d){if(!d)return;clampDates();if(!liveReady())liveEnsure();else renderSafe();if(passed())askMyCell()});
+  setInterval(function(){if(document.hidden)return;liveFlush();liveLoad(viewYm()).then(function(d){if(d)renderSafe()})},20000);
+  document.addEventListener('visibilitychange',function(){if(!document.hidden){liveFlush();liveLoad(viewYm()).then(function(d){if(d)renderSafe()})}});
+  window.addEventListener('online',liveFlush);
+  liveFlush();
+}
+function syncBadge(){var b=document.querySelector('.sync');if(!b)return;var n=LV.q.length,off=LV.err>0;
+  b.classList.toggle('off',off);b.lastChild.textContent=n?(off?'저장 대기 '+n:'저장 중'):(off?'연결 끊김':'실시간');
+  b.title=n?'아직 시트에 저장되지 않은 기록이 '+n+'개 있어요. 연결되면 자동으로 저장돼요.':'다른 사람이 입력한 내용이 몇 초 안에 나타나요'}
+function markPending(){var p={};LV.q.forEach(function(op){if(op.a==='mark'&&op.date===S.date)p[op.name]=1});
+  Array.prototype.forEach.call(main.querySelectorAll('.prow'),function(r){r.classList.toggle('pend',!!p[r.getAttribute('data-row')])})}
+function myCell(){try{return localStorage.getItem(CELL_KEY)||''}catch(e){return ''}}
+function myCellName(){var g=gOf(myCell());return g?(g.id==='staff'?'총무단, 새가족':g.name):'안 고름'}
+function askMyCell(force){if(!force&&myCell())return;if(!force&&!sheet.hidden)return;
+  openSheet('<h2>어느 셀이세요?</h2><p>한 번만 고르면 돼요. 주일 저녁 8시 30분에 출석체크가 안 된 셀에만 가는 알림에 써요. 설정(🔔)에서 언제든 바꿀 수 있어요.</p>'+
+    '<div class="cellpick">'+GROUPS.map(function(g){return '<button type="button" class="btn'+(myCell()===g.id?' primary':'')+'" data-mycell="'+g.id+'">'+(g.id==='staff'?'총무단, 새가족':g.name+(g.leader?' <small>'+esc(g.leader)+'</small>':''))+'</button>'}).join('')+'</div>')}
+/* 카톡에 붙여넣을 이번 주 요약 */
+function weekReport(){
+  var ws=weekStart(S.date),wa=ws.split('-').map(Number),ORD=['첫째','둘째','셋째','넷째','다섯째'];
+  var out=['[생명교구] '+wa[1]+'월 '+ORD[Math.ceil(wa[2]/7)-1]+' 주 출석'];
+  weekDays().filter(function(d){return kindOf(d)!=='etc'&&(d<=TODAY||hasRec(d))}).forEach(function(d){var s=sumDay(d),k=kindOf(d);
+    if(k==='sun'){out.push('','▪ '+sd(d)+' 주일예배 '+s.total+'명','  5부 현장 '+s.site+' · 5부 온라인 '+s.online+' · 대예배 '+s.main,'  셀모임 '+s.cell+'명');
+      out.push('  셀별 예배: '+GROUPS.map(function(g){return (g.id==='staff'?'총무단':g.name)+' '+sumDay(d,g.id).total}).join(' · '))}
+    else out.push('','▪ '+sd(d)+' 금요철야 '+s.total+'명','  현장 '+s.site+' · 온라인 '+s.online)});
+  if(out.length===1)out.push('','아직 기록된 모임이 없어요.');
+  return out.join('\n')}
+function copyWeek(){var t=weekReport();
+  function fallback(){openSheet('<h2>이번 주 요약</h2><p>아래 글을 길게 눌러 복사해 주세요.</p><textarea class="copybox" readonly rows="12">'+esc(t)+'</textarea><div class="actions"><button type="button" class="btn" data-close>닫기</button></div>')}
+  try{navigator.clipboard.writeText(t).then(function(){toast('이번 주 요약을 복사했어요. 카톡에 붙여넣으세요')},fallback)}catch(e){fallback()}}
 
 /* ---------- entry code (in the real app the server checks it; here it only gates the preview) ---------- */
 var ENTRY_CODE='life29',PASS_KEY='saengmyeong-pass';
@@ -1075,12 +1180,12 @@ var gate=$('#gate');
 if(!passed()){gate.hidden=false;setTimeout(function(){var i=$('#gate-code');i&&i.focus()},80)}
 $('#gateform').addEventListener('submit',function(e){
   e.preventDefault();var inp=$('#gate-code'),v=inp.value.trim().toLowerCase();
-  if(v===ENTRY_CODE){try{localStorage.setItem(PASS_KEY,ENTRY_CODE)}catch(err){}gate.hidden=true;toast('환영해요. 이제 출석을 기록할 수 있어요.');return}
+  if(v===ENTRY_CODE){try{localStorage.setItem(PASS_KEY,ENTRY_CODE)}catch(err){}gate.hidden=true;toast('환영해요. 이제 출석을 기록할 수 있어요.');if(LIVE_URL)setTimeout(function(){askMyCell()},400);return}
   $('#gate-err').textContent=v?'코드가 맞지 않아요. 다시 확인해 주세요.':'입장 코드를 입력해 주세요.';
   gate.classList.remove('shake');void gate.offsetWidth;gate.classList.add('shake');inp.select();
 });
 
-render();
+if(LIVE_URL)liveStart();else render();
 })();
 </script>
 
