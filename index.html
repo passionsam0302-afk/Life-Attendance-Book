@@ -871,7 +871,7 @@ function renderStats(){
       return '<td style="background:color-mix(in srgb,var(--leaf) '+Math.round(r*88)+'%,var(--surface-2));color:'+(r>.5?'var(--leaf-ink)':'var(--ink)')+'">'+c+'</td>'}).join('')+'</tr>'}).join('');
   var total='<tr class="total"><th class="row" scope="row">합계</th>'+ds.map(function(d){return d>TODAY?'<td class="fut">–</td>':'<td>'+cnt(d)+'</td>'}).join('')+'</tr>';
   main.innerHTML=
-    '<div class="page-h"><div><h2>현황</h2><p>시트의 ‘총 합계’ 탭과 같은 숫자예요.</p></div></div>'+
+    '<div class="page-h"><div><h2>현황</h2><p>출석부 시트 월별 탭 맨 위 합계와 같은 숫자예요.</p></div></div>'+
     '<div class="month"><button type="button" class="mnav" data-mnav="-1" aria-label="이전 달"'+(S.month<=Y0.slice(0,7)?' disabled':'')+'>'+ICON.prev+'</button><h3>'+mLabel(S.month)+'</h3><button type="button" class="mnav" data-mnav="1" aria-label="다음 달"'+(S.month>=Y1.slice(0,7)?' disabled':'')+'>'+ICON.next+'</button></div>'+
     '<div class="chips scrollx">'+MEASURES.map(function(x){return '<button type="button" class="chip" data-measure="'+x.k+'" aria-pressed="'+(x.k===ms.k)+'">'+x.label+'</button>'}).join('')+'</div>'+
     '<div class="avg"><b>'+(past.length?avg:'–')+'</b><span>'+(past.length?'명, '+Number(S.month.slice(5))+'월 '+ms.label+' 평균 ('+past.length+'번)':'이 달은 아직 기록이 없어요')+'</span></div>'+
@@ -1121,7 +1121,7 @@ function liveLoad(ym){
     delete LV.loading[ym];
     if(res&&res.auth){try{localStorage.removeItem(PASS_KEY)}catch(e){}gate.hidden=false;throw new Error('입장 코드를 다시 입력해 주세요')}
     if(!res||!res.ok)throw new Error((res&&res.error)||'불러오지 못했어요');
-    liveApply(res.data);LV.err=0;syncBadge();return res.data;
+    liveApply(res.data);saveSnap(res.data);LV.err=0;syncBadge();return res.data;
   }).catch(function(e){delete LV.loading[ym];LV.err++;syncBadge();
     if(!LV.loaded[viewYm()])main.innerHTML='<div class="empty"><p>출석부를 불러오지 못했어요. 인터넷 연결을 확인해 주세요.</p><p style="font-size:12.5px">'+esc(e.message||'')+'</p><button type="button" class="btn" data-retry>다시 시도</button></div>'});
   LV.loading[ym]=p;return p;
@@ -1141,6 +1141,11 @@ function liveApply(d){
   NOTICES=d.notices||[];
   LV.loaded[d.ym]=Date.now();
 }
+/* 마지막으로 받은 달 내용을 폰에 남겨 두고, 다음에 앱을 열면 먼저 보여준 뒤 서버 내용으로 바꿔요 (연락처는 남기지 않음) */
+var SNAP_KEY='saengmyeong-snap-';
+function saveSnap(d){try{var c=JSON.parse(JSON.stringify(d));delete c.today;(c.members||[]).forEach(function(m){m.phone=''});localStorage.setItem(SNAP_KEY+d.ym,JSON.stringify(c));
+  var keep=[SNAP_KEY+d.ym,SNAP_KEY+viewYm()];for(var i=localStorage.length-1;i>=0;i--){var k=localStorage.key(i);if(k&&k.indexOf(SNAP_KEY)===0&&keep.indexOf(k)<0)localStorage.removeItem(k)}}catch(e){}}
+function loadSnap(ym){try{return JSON.parse(localStorage.getItem(SNAP_KEY+ym)||'null')}catch(e){return null}}
 function firstMeetingFrom(k){var d=k;for(var i=0;i<14;i++){if(kindOf(d)!=='etc')return d;d=addDays(d,1)}return k}
 function clampDates(){if(S.date<Y0)S.date=firstMeetingFrom(Y0);if(S.date>Y1)S.date=lastMeetingOnOrBefore(Y1);if(S.month<Y0.slice(0,7))S.month=Y0.slice(0,7);if(S.month>Y1.slice(0,7))S.month=Y1.slice(0,7)}
 function homeDay(){var d=lastMeetingOnOrBefore(TODAY);return d<Y0?firstMeetingFrom(Y0):d}
@@ -1150,6 +1155,7 @@ function liveStart(){
   var draft=document.querySelector('.draft');if(draft)draft.hidden=true;   /* "시안 화면이에요" 안내는 미리보기에서만 */
   syncBadge();
   main.innerHTML='<p class="empty">출석부를 불러오는 중이에요…</p>';
+  var snap=loadSnap(viewYm());if(snap&&snap.ym===viewYm()){liveApply(snap);clampDates();renderSafe()}
   liveLoad(viewYm()).then(function(d){if(!d)return;clampDates();if(!liveReady())liveEnsure();else renderSafe();if(passed())askMyCell()});
   setInterval(function(){if(document.hidden)return;liveFlush();liveLoad(viewYm()).then(function(d){if(d)renderSafe()})},20000);
   document.addEventListener('visibilitychange',function(){if(!document.hidden){liveFlush();liveLoad(viewYm()).then(function(d){if(d)renderSafe()})}});
