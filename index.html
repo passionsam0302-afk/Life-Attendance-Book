@@ -666,7 +666,8 @@ var LOGO_SM=function(id){return '<svg viewBox="0 0 40 40" aria-hidden="true"><de
 /* 총무단 코드: real app checks it on the server. Placeholder until the user picks one. */
 var ADMIN_CODE='staff29',ADMIN_KEY='saengmyeong-admin';
 S.admin=(function(){try{return localStorage.getItem(ADMIN_KEY)==='1'}catch(e){return false}})();
-var NOTIFY={att:true,notice:true};
+var NOTIFY_KEY='saengmyeong-notify';
+var NOTIFY=(function(){var d={att:true,notice:true};try{var v=JSON.parse(localStorage.getItem(NOTIFY_KEY)||'null');if(v){d.att=v.att!==false;d.notice=v.notice!==false}}catch(e){}return d})();
 var NOTICES=[
   {id:'n1',title:'성탄 찬양 첫 연습',body:'5부예배 마치고 본당 지하 2층에서 모여요.\n악보는 교구 단톡방에 올려두었어요.',date:'2026-11-29',remind:true,created:'2026-11-22'},
   {id:'n2',title:'12월 교구 MT 신청 마감',body:'12월 5일(토) 1박 2일로 교구 MT를 가요.\n참가비 3만 원, 셀리더에게 신청해 주세요.',date:'2026-12-05',remind:true,created:'2026-11-18'},
@@ -939,12 +940,16 @@ function pushSection(){
   return '<h3>이 폰에서 알림 받기</h3><div class="setlist"><div class="setrow"><div><b>'+label+'</b><small>'+help+'</small></div>'+
     (p==='granted'||p==='denied'?'':'<button type="button" class="mini" data-push-enable>알림 켜기</button>')+'</div></div>';
 }
+/* send this phone's alert choices to OneSignal as tags (att, notice = '1' or '0'); the Apps Script skips phones tagged '0' */
+function syncPushTags(){try{localStorage.setItem(NOTIFY_KEY,JSON.stringify(NOTIFY))}catch(e){}
+  if(!window.OneSignalDeferred||pushPerm()!=='granted')return;
+  window.OneSignalDeferred.push(async function(OS){try{await OS.User.addTags({att:NOTIFY.att?'1':'0',notice:NOTIFY.notice?'1':'0'})}catch(e){}});}
 function enablePush(){
   if(!window.OneSignalDeferred){toast('홈 화면에 설치한 앱에서 알림을 켤 수 있어요');return}
   if(/iPhone|iPad|iPod/.test(navigator.userAgent)&&!isStandalone()){toast('아이폰은 홈 화면에 추가한 앱에서 켤 수 있어요');return}
   window.OneSignalDeferred.push(async function(OS){
     try{await OS.Notifications.requestPermission()}catch(e){}
-    var p=pushPerm();toast(p==='granted'?'알림을 켰어요':'알림이 허용되지 않았어요. 폰 설정에서 바꿀 수 있어요');
+    var p=pushPerm();if(p==='granted')syncPushTags();toast(p==='granted'?'알림을 켰어요':'알림이 허용되지 않았어요. 폰 설정에서 바꿀 수 있어요');
     if(!sheet.hidden)openInstall();
   });
 }
@@ -963,7 +968,7 @@ function openInstall(){
 sheet.addEventListener('click',function(e){
   var t=e.target.closest('button');if(!t||t.disabled)return;
   if(t.hasAttribute('data-close')){closeSheet();return}
-  if(t.hasAttribute('data-tg')){var k=t.getAttribute('data-tg');NOTIFY[k]=!NOTIFY[k];t.setAttribute('aria-checked',NOTIFY[k]);
+  if(t.hasAttribute('data-tg')){var k=t.getAttribute('data-tg');NOTIFY[k]=!NOTIFY[k];t.setAttribute('aria-checked',NOTIFY[k]);syncPushTags();
     toast((k==='att'?'출석체크 알림':'일정 알림')+'을 '+(NOTIFY[k]?'켰어요':'껐어요'));openInstall();return}
   if(t.hasAttribute('data-preview')){previewPush(t.getAttribute('data-preview'));return}
   if(t.hasAttribute('data-push-enable')){enablePush();return}
