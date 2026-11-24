@@ -14,6 +14,18 @@
 <meta name="apple-mobile-web-app-title" content="생명교구">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <style>html{color-scheme:light}:root{padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<!-- push notifications (OneSignal). The app lives under /Life-Attendance-Book/, so the worker path and scope point there. -->
+<script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+<script>
+  window.OneSignalDeferred = window.OneSignalDeferred || [];
+  OneSignalDeferred.push(async function(OneSignal) {
+    await OneSignal.init({
+      appId: "8ebc1d06-6475-4db8-bd91-92e0848b92fa",
+      serviceWorkerPath: "Life-Attendance-Book/OneSignalSDKWorker.js",
+      serviceWorkerParam: { scope: "/Life-Attendance-Book/" },
+    });
+  });
+</script>
 </head>
 <body>
 <meta name="claude:viewport-fit-sides" content="cover">
@@ -917,13 +929,32 @@ function calHTML(){
 function selNum(){var b=sheet.querySelector('.phone b');if(!b)return;var r=document.createRange();r.selectNodeContents(b);var s=window.getSelection();s.removeAllRanges();s.addRange(r);toast('번호를 선택했어요. 길게 눌러 복사하세요')}
 function openCal(){S.calMonth=S.date.slice(0,7);openSheet(calHTML())}
 function setRow(k,title,desc){return '<div class="setrow"><div><b>'+title+'</b><small>'+desc+'</small><button type="button" class="linkbtn" data-preview="'+k+'">알림 미리보기</button></div><button type="button" class="tg" role="switch" aria-checked="'+NOTIFY[k]+'" aria-label="'+title+'" data-tg="'+k+'"><i></i></button></div>'}
+/* this phone's real notification permission (OneSignal is loaded only in the installed app, not in the claude.ai preview) */
+function isStandalone(){try{return (window.matchMedia&&matchMedia('(display-mode: standalone)').matches)||navigator.standalone===true}catch(e){return false}}
+function pushPerm(){try{return ('Notification' in window)?Notification.permission:'unsupported'}catch(e){return 'unsupported'}}
+function pushSection(){
+  var p=pushPerm(),label={granted:'켜짐',denied:'차단됨',default:'꺼짐',unsupported:'지원 안 됨'}[p]||'꺼짐';
+  var help=p==='granted'?'이 폰으로 출석체크와 일정 알림이 와요.':p==='denied'?'폰 설정 → 알림 → 생명교구에서 허용으로 바꿔주세요.':
+    !window.OneSignalDeferred?'홈 화면에 설치한 앱에서 켤 수 있어요.':'눌러서 이 폰의 알림을 허용해 주세요.';
+  return '<h3>이 폰에서 알림 받기</h3><div class="setlist"><div class="setrow"><div><b>'+label+'</b><small>'+help+'</small></div>'+
+    (p==='granted'||p==='denied'?'':'<button type="button" class="mini" data-push-enable>알림 켜기</button>')+'</div></div>';
+}
+function enablePush(){
+  if(!window.OneSignalDeferred){toast('홈 화면에 설치한 앱에서 알림을 켤 수 있어요');return}
+  if(/iPhone|iPad|iPod/.test(navigator.userAgent)&&!isStandalone()){toast('아이폰은 홈 화면에 추가한 앱에서 켤 수 있어요');return}
+  window.OneSignalDeferred.push(async function(OS){
+    try{await OS.Notifications.requestPermission()}catch(e){}
+    var p=pushPerm();toast(p==='granted'?'알림을 켰어요':'알림이 허용되지 않았어요. 폰 설정에서 바꿀 수 있어요');
+    if(!sheet.hidden)openInstall();
+  });
+}
 function openInstall(){
   var al=upcomingAlerts(4);
   openSheet('<div class="homeicon">'+LOGO_SM('lgB')+'<span>생명교구</span></div>'+
-    '<h2 style="text-align:center">알림과 앱 설치</h2>'+
+    '<h2 style="text-align:center">알림과 앱 설치</h2>'+pushSection()+
     '<h3>알림</h3><div class="setlist">'+setRow('att','출석체크 알림','금요일 오후 10:30, 주일 오후 6:00')+setRow('notice','일정 알림','날짜가 있는 일정은 하루 전 오후 8:00')+'</div>'+
     '<h3>예정된 알림</h3>'+(al.length?'<ul class="sched">'+al.map(function(x){return '<li><time>'+sd(x.d)+' ('+DOW[dowIdx(x.d)]+') '+t2k(x.t)+'</time><span>'+esc(x.what)+'</span></li>'}).join('')+'</ul>':'<p>켜진 알림이 없어요.</p>')+
-    '<p class="note">알림은 앱을 홈 화면에 설치하고 "알림 허용"을 누른 휴대폰에만 와요. 아이폰은 iOS 16.4 이상이 필요해요. 지금 시안에서는 미리보기만 볼 수 있어요.</p>'+
+    '<p class="note">알림은 앱을 홈 화면에 설치하고 "알림 허용"을 누른 휴대폰에만 와요. 아이폰은 iOS 16.4 이상이 필요해요. 알림 미리보기는 화면에서 보여주기만 해요.</p>'+
     '<h3>총무단 모드</h3><div class="setlist"><div class="setrow"><div><b>'+(S.admin?'켜짐':'꺼짐')+'</b><small>'+(S.admin?'이 기기에서 일정을 쓰고 고칠 수 있어요':'총무단 코드를 입력하면 일정을 쓸 수 있어요')+'</small></div><button type="button" class="mini" data-admin-toggle>'+(S.admin?'끄기':'켜기')+'</button></div></div>'+
     '<h3>아이폰에 설치</h3><ol class="steps"><li>받은 링크를 <b>Safari</b>로 열어요. 카카오톡 안에서 열렸다면 오른쪽 아래 메뉴에서 ‘다른 브라우저로 열기’를 눌러요.</li><li>화면 아래 <b>공유</b> 버튼을 눌러요.</li><li><b>홈 화면에 추가</b>를 누르면 끝이에요.</li></ol>'+
     '<h3>안드로이드에 설치</h3><ol class="steps"><li>받은 링크를 <b>Chrome</b>으로 열어요.</li><li>화면에 뜨는 <b>앱 설치</b>를 누르거나, 오른쪽 위 메뉴에서 <b>홈 화면에 추가</b>를 눌러요.</li></ol>'+
@@ -935,6 +966,7 @@ sheet.addEventListener('click',function(e){
   if(t.hasAttribute('data-tg')){var k=t.getAttribute('data-tg');NOTIFY[k]=!NOTIFY[k];t.setAttribute('aria-checked',NOTIFY[k]);
     toast((k==='att'?'출석체크 알림':'일정 알림')+'을 '+(NOTIFY[k]?'켰어요':'껐어요'));openInstall();return}
   if(t.hasAttribute('data-preview')){previewPush(t.getAttribute('data-preview'));return}
+  if(t.hasAttribute('data-push-enable')){enablePush();return}
   if(t.hasAttribute('data-admin-toggle')){if(S.admin){setAdmin(false);toast('총무단 모드를 껐어요');openInstall();if(S.tab==='home')renderHome()}else openAdminLogin('settings');return}
   if(t.hasAttribute('data-copy')){var num=t.getAttribute('data-copy');
     try{navigator.clipboard.writeText(num).then(function(){toast('번호를 복사했어요')},function(){selNum()})}catch(err){selNum()}
