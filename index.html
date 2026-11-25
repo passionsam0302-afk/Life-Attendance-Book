@@ -890,16 +890,16 @@ function renderStats(){
 /* ---------- roster tab ---------- */
 function monthCount(m,ym){var c=0;monthDays(ym).forEach(function(d){var r=rec(d,m.id);if(r.svc)c++;if(r.cell)c++});return c}
 function renderRoster(){
-  main.innerHTML='<div class="page-h"><div><h2>명단</h2><p>'+M.length+'명, 숫자는 이번 달 출석 횟수예요</p></div><button type="button" class="addbtn" data-add>'+(S.admin?'':ICON.lock)+'새 사람 추가</button></div>'+
+  main.innerHTML='<div class="page-h"><div><h2>명단</h2><p>'+M.length+'명</p></div><button type="button" class="addbtn" data-add>'+(S.admin?'':ICON.lock)+'새 사람 추가</button></div>'+
     '<div class="search" style="margin-top:0">'+ICON.search+'<input id="rq" type="search" placeholder="이름 찾기" value="'+esc(S.rq)+'" autocomplete="off" aria-label="이름 찾기"></div>'+
     '<div class="chips scrollx">'+chipHTML(S.rg,'rg')+'</div><div class="plist" id="plist" style="margin-top:6px"></div>';
   renderPlist();
 }
 function renderPlist(){
-  var box=$('#plist');if(!box)return;var ym=TODAY.slice(0,7),mds=meetDays(ym);
+  var box=$('#plist');if(!box)return;
   var list=orderMembers(M.filter(function(m){return(S.rg==='all'||m.group===S.rg)&&(!S.rq||m.name.indexOf(S.rq)>-1)}));
   box.innerHTML=list.length?list.map(function(m){var g=gOf(m.group);
-    return '<button type="button" class="person" data-person="'+m.id+'"><span class="av'+(m.role==='새가족'?' new':'')+'">'+m.name.charAt(0)+'</span><span class="pinfo"><b>'+m.name+'</b><small>'+g.name+(m.role?', '+m.role:'')+(m.gen?', '+m.gen+'기':'')+'</small></span><span class="pright"><span class="pc">'+monthCount(m,ym)+'회</span><span class="strip" aria-hidden="true">'+mds.map(function(d){return '<i class="'+(d>TODAY?'f':attended(d,m.id)?'on':'')+'"></i>'}).join('')+'</span></span></button>'}).join('')
+    return '<button type="button" class="person" data-person="'+m.id+'"><span class="av'+(m.role==='새가족'?' new':'')+'">'+m.name.charAt(0)+'</span><span class="pinfo"><b>'+m.name+'</b><small>'+g.name+(m.role?', '+m.role:'')+(m.gen?', '+m.gen+'기':'')+'</small></span></button>'}).join('')   /* 11-25: 이번 달 횟수·점 표시는 사용자 요청으로 뺌 */
     :'<p class="empty">찾는 이름이 없어요. 오른쪽 위 ‘새 사람 추가’로 등록할 수 있어요.</p>';
 }
 
@@ -930,11 +930,20 @@ function openPerson(id){
     '<h3>'+Number(ym.slice(5))+'월 기록, '+monthCount(m,ym)+'회</h3><div class="rec">'+(rows||'<p>이 달에는 아직 기록이 없어요.</p>')+'</div>'+
     '<div class="actions"><button type="button" class="btn" data-close>닫기</button><button type="button" class="btn primary" data-save="'+m.id+'">저장</button></div>');
 }
+/* 새 사람 추가의 역할 칸 (11-25): 셀이면 셀리더·부셀리더·봉사자(비우면 셀원), "총무단, 새가족"이면 새가족으로 고정
+   (앱에서 추가한 사람은 명단의 새가족 시트로 들어가요. 총무단은 명단 시트에서 직접) */
+function addRoleHTML(g){
+  if(g==='staff')return '<label for="add-role">역할</label><input id="add-role" value="새가족" disabled><p style="font-size:12.5px;color:var(--ink-3);margin:2px 0 0">새가족으로 추가돼요. 총무단은 명단 시트에서 직접 추가해 주세요.</p>';
+  return '<label for="add-role">역할</label><input id="add-role" placeholder="비워두면 셀원" autocomplete="off">'+
+    '<div class="rolechips">'+ROLES.map(function(r){return '<button type="button" class="chip" data-role="'+r+'" data-for="add-role">'+r+'</button>'}).join('')+'</div>';
+}
+sheet.addEventListener('change',function(e){if(e.target.id==='add-group'){var f=$('#add-role-f');if(f)f.innerHTML=addRoleHTML(e.target.value)}});
 function openAdd(){
   openSheet('<h2>새 사람 추가</h2><p>추가하면 시트의 해당 셀 명단 맨 아래에 한 줄이 생겨요.</p>'+
     '<form id="addform" autocomplete="off">'+
     '<div class="field"><label for="add-name">이름</label><input id="add-name" required maxlength="10" placeholder="예: 김하늘"></div>'+
     '<div class="field"><label for="add-group">소속</label><select id="add-group">'+GROUPS.map(function(g){return '<option value="'+g.id+'"'+(g.id==='staff'?' selected':'')+'>'+g.name+(g.leader?' ('+g.leader+')':'')+'</option>'}).join('')+'</select></div>'+
+    '<div class="field" id="add-role-f">'+addRoleHTML('staff')+'</div>'+
     '<div class="field"><span class="lbl" id="add-gender-l">성별</span><div class="radios" role="radiogroup" aria-labelledby="add-gender-l"><label><input type="radio" name="add-gender" id="add-gender-f" value="여" checked><span>여</span></label><label><input type="radio" name="add-gender" id="add-gender-m" value="남"><span>남</span></label></div></div>'+
     '<div class="row2"><div class="field"><label for="add-birth">생년월일</label><input id="add-birth" placeholder="2003. 4. 12"></div><div class="field"><label for="add-gen">기수</label><input id="add-gen" inputmode="numeric" placeholder="28"></div></div>'+
     '<div class="field"><label for="add-phone">연락처</label><input id="add-phone" type="tel" inputmode="tel" placeholder="010-0000-0000"></div>'+
@@ -1039,8 +1048,9 @@ sheet.addEventListener('submit',function(e){
   var name=$('#add-name').value.trim();if(!name){$('#add-name').focus();return}
   var g=$('#add-group').value,gender=(sheet.querySelector('input[name="add-gender"]:checked')||{}).value||'여';
   if(LIVE_URL&&byId(name)){toast(name+' 님은 이미 명단에 있어요');return}
-  if(LIVE_URL)liveQueue({a:'add',name:name,group:g,gender:gender,birth:$('#add-birth').value.trim(),phone:$('#add-phone').value.trim(),gen:$('#add-gen').value.trim(),note:$('#add-note').value.trim(),admin:adminCode()});
-  var o0=nextOrd();uid++;M.push({id:LIVE_URL?name:'m'+uid,ord:o0,name:name,group:g,role:g==='staff'?'새가족':'',gender:gender,birth:$('#add-birth').value.trim(),phone:$('#add-phone').value.trim(),gen:$('#add-gen').value.trim(),note:$('#add-note').value.trim(),p:.5});
+  var role=g==='staff'?'새가족':(($('#add-role')||{}).value||'').trim();if(role==='셀원')role='';
+  if(LIVE_URL)liveQueue({a:'add',name:name,group:g,role:role,gender:gender,birth:$('#add-birth').value.trim(),phone:$('#add-phone').value.trim(),gen:$('#add-gen').value.trim(),note:$('#add-note').value.trim(),admin:adminCode()});
+  var o0=nextOrd();uid++;M.push({id:LIVE_URL?name:'m'+uid,ord:o0,name:name,group:g,role:role,gender:gender,birth:$('#add-birth').value.trim(),phone:$('#add-phone').value.trim(),gen:$('#add-gen').value.trim(),note:$('#add-note').value.trim(),p:.5});
   closeSheet();toast(name+' 님을 '+gOf(g).name+'에 추가했어요');render();
 });
 
@@ -1081,10 +1091,10 @@ main.addEventListener('click',function(e){
     var cand=[ws,addDays(ws,5)].filter(inYear);var pastC=cand.filter(function(d){return d<=TODAY});
     S.date=pastC.length?pastC[pastC.length-1]:cand[0];render();return}
   if(t.hasAttribute('data-opencal')){openCal();return}
-  if(t.hasAttribute('data-g')){S.group=t.getAttribute('data-g');renderCheck();return}
+  if(t.hasAttribute('data-g')){S.group=t.getAttribute('data-g');render();return}
   if(t.hasAttribute('data-mnav')){var nm=shiftMonth(S.month,Number(t.getAttribute('data-mnav')));if(nm<Y0.slice(0,7)||nm>Y1.slice(0,7))return;S.month=nm;render();return}
-  if(t.hasAttribute('data-measure')){S.smeasure=t.getAttribute('data-measure');renderStats();return}
-  if(t.hasAttribute('data-rg')){S.rg=t.getAttribute('data-rg');renderRoster();return}
+  if(t.hasAttribute('data-measure')){S.smeasure=t.getAttribute('data-measure');render();return}
+  if(t.hasAttribute('data-rg')){S.rg=t.getAttribute('data-rg');render();return}
   if(t.hasAttribute('data-person')){openPerson(t.getAttribute('data-person'));return}
   if(t.hasAttribute('data-retry')){liveEnsure();return}
   if(t.hasAttribute('data-copyweek')){copyWeek();return}
@@ -1098,7 +1108,12 @@ $('#installBtn').addEventListener('click',openInstall);
 
 /* ---------- tabs ---------- */
 function go(tab){S.tab=tab;Array.prototype.forEach.call(document.querySelectorAll('.nav button'),function(b){if(b.getAttribute('data-tab')===tab)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')});render();window.scrollTo(0,0)}
-function render(){if(LIVE_URL&&!liveReady()){liveEnsure();return}if(S.tab==='home')renderHome();else if(S.tab==='check')renderCheck();else if(S.tab==='stats')renderStats();else renderRoster()}
+/* 같은 탭을 다시 그릴 때는 칩 줄(가로 스크롤) 위치를 그대로 둬요 (11-25 사용자 요청) */
+var lastTab=null;
+function render(){if(LIVE_URL&&!liveReady()){liveEnsure();return}
+  var xs=lastTab===S.tab?Array.prototype.map.call(main.querySelectorAll('.scrollx'),function(e){return e.scrollLeft}):[];lastTab=S.tab;
+  if(S.tab==='home')renderHome();else if(S.tab==='check')renderCheck();else if(S.tab==='stats')renderStats();else renderRoster();
+  Array.prototype.forEach.call(main.querySelectorAll('.scrollx'),function(e,i){if(xs[i])e.scrollLeft=xs[i]})}
 document.querySelector('.nav').addEventListener('click',function(e){var b=e.target.closest('[data-tab]');if(!b)return;var tb=b.getAttribute('data-tab');
   if(tb==='check'&&S.tab!=='check'){S.date=focusMeeting();clampDates()}   /* 다른 탭에서 출석으로 오면 지금 가장 관련 있는 모임부터 */
   go(tb)});
