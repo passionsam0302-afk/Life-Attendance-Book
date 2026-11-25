@@ -1081,12 +1081,10 @@ sheet.addEventListener('input',function(e){
 });
 sheet.addEventListener('change',function(e){if(e.target.id==='pn-target')disarmPush()});
 function disarmPush(){var f=$('#pushform'),b=$('#pn-send');if(f&&f.getAttribute('data-arm')){f.removeAttribute('data-arm');b.textContent='보내기';b.classList.remove('danger')}}
-function openInstall(){
-  var al=upcomingAlerts(4);
+function openInstall(){   /* 11-25: "예정된 알림" 칸은 사용자 요청으로 뺌 */
   openSheet('<div class="homeicon">'+LOGO_SM('lgB')+'<span>생명교구</span></div>'+
     '<h2 style="text-align:center">알림과 앱 설치</h2>'+pushSection()+(LIVE_URL?'<h3>내 셀</h3><div class="setlist"><div class="setrow"><div><b>'+myCellName()+'</b><small>출석체크가 안 된 셀 알림(주일 오후 8:30)이 이 셀 기준으로 와요</small></div><button type="button" class="mini" data-mycell-open>바꾸기</button></div></div>':'')+
     '<h3>알림</h3><div class="setlist">'+setRow('att','출석체크 알림','금요일 오후 10:30, 주일 오후 6:00'+(LIVE_URL?', 내 셀이 체크 전이면 주일 오후 8:30':''))+setRow('notice','일정·소식 알림','날짜가 있는 일정은 하루 전 오후 8:00, 생명소식이 바뀌면 바로')+'</div>'+
-    '<h3>예정된 알림</h3>'+(al.length?'<ul class="sched">'+al.map(function(x){return '<li><time>'+sd(x.d)+' ('+DOW[dowIdx(x.d)]+') '+t2k(x.t)+'</time><span>'+esc(x.what)+'</span></li>'}).join('')+'</ul>':'<p>켜진 알림이 없어요.</p>')+
     '<p class="note">알림은 앱을 홈 화면에 설치하고 "알림 허용"을 누른 휴대폰에만 와요. 아이폰은 iOS 16.4 이상이 필요해요. 알림 미리보기는 화면에서 보여주기만 해요.</p>'+
     '<h3>총무단 모드</h3><div class="setlist"><div class="setrow"><div><b>'+(S.admin?'켜짐':'꺼짐')+'</b><small>'+(S.admin?'이 기기에서 일정 쓰기, 새 사람 추가, 셀 이동을 할 수 있어요':'총무단 코드를 입력하면 일정 쓰기, 새 사람 추가, 셀 이동을 할 수 있어요')+'</small></div><button type="button" class="mini" data-admin-toggle>'+(S.admin?'끄기':'켜기')+'</button></div></div>'+
     (S.admin?'<h3>총무단 도구</h3><div class="setlist">'+
