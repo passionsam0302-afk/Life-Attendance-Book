@@ -489,6 +489,18 @@ button{cursor:pointer}
   --b-site:#86D3A2; --b-online:#A3BEF0; --b-main:#E6BC62; --b-cell:#EAF3EC;
 }
 .wk .now{color:var(--leaf)}
+/* 생명소식 (인스타, 11-25) */
+.news-card .instagram-media{background:#fff!important;border:0!important;border-radius:14px!important;margin:0!important;max-width:100%!important;min-width:0!important;width:100%!important;box-shadow:none!important;padding:0!important}
+.news-card iframe{border-radius:14px!important;max-width:100%!important;min-width:0!important}
+.news-card blockquote > a{display:block;padding:18px;text-align:center;color:var(--leaf);text-decoration:none}
+.news-act{display:flex;align-items:center;gap:8px;margin-top:8px}
+.news-act.news-only{justify-content:flex-end}
+.linkbar{flex:1;min-width:0;display:flex;align-items:center;gap:8px;border:0;background:var(--surface);border-radius:999px;padding:0 6px 0 16px;height:42px;color:var(--ink-3);font-size:13px;text-align:left}
+.linkbar span{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.linkbar svg{flex:none;width:30px;height:30px;padding:6px;box-sizing:border-box;border-radius:50%;background:var(--leaf-soft);color:var(--leaf)}
+.igbtn{flex:none;width:42px;height:42px;border-radius:12px;background:var(--surface);color:var(--leaf);display:grid;place-items:center}
+.igbtn svg{width:22px;height:22px}
+.news-empty{background:var(--surface);border-radius:14px;padding:18px 14px}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 
@@ -688,6 +700,7 @@ ICON.lock='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-wid
 ICON.bellS='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 16.5V11a6 6 0 0112 0v5.5l1.5 2h-15z"/><path d="M10 20.5a2.2 2.2 0 004 0"/></svg>';
 ICON.mega='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10v4h3l7 4V6L7 10z"/><path d="M17.5 9.5a3.5 3.5 0 010 5"/></svg>';
 ICON.arrow='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
+ICON.insta='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="17" height="17" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.2" cy="6.8" r=".6" fill="currentColor"/></svg>';
 var LOGO_SM=function(id){return '<svg viewBox="0 0 40 40" aria-hidden="true"><defs><linearGradient id="'+id+'" x1="0" y1="1" x2="1" y2="0"><stop offset="0" style="stop-color:var(--logo-leaf)"/><stop offset="1" style="stop-color:var(--logo-leaf-2)"/></linearGradient></defs><rect class="lg-bg" x=".5" y=".5" width="39" height="39" rx="10"/><path class="lg-st" d="M20 30.5c-.2-3.6.3-7.4-.1-10.8"/><path fill="url(#'+id+')" d="M19.8 22.3c-.7-5.7-4.6-8.8-10.9-8.3.4 6 4.4 8.9 10.9 8.3z"/><path fill="url(#'+id+')" d="M20 19.6c.4-6.4 4.5-10.2 11.2-9.8-.2 6.6-4.5 10.1-11.2 9.8z"/><path class="lg-soil" d="M13.5 31h13"/></svg>'};
 
 /* 총무단 코드: real app checks it on the server. Placeholder until the user picks one. */
@@ -728,12 +741,44 @@ function noticeHTML(n){
     '<span class="nt-txt"><span class="nt-title">'+esc(n.title)+'</span><span class="nt-body">'+esc(n.body)+'</span><span class="nmeta">'+meta.join('')+'</span></span></button>'+
     (open&&S.admin?'<div class="nt-act"><button type="button" class="mini" data-editnotice="'+n.id+'">수정</button><button type="button" class="mini danger" data-delnotice="'+n.id+'">'+(S.delArm===n.id?'한 번 더 누르면 삭제돼요':'삭제')+'</button></div>':'')+'</div>';
 }
+/* ---------- 생명소식 (인스타 게시물, 11-25) ----------
+   총무단이 게시물 링크를 넣으면 메인 주요 일정 아래에 인스타 카드로 보여요. 링크가 바뀌면 서버가 리더들에게 알림.
+   메인은 20초마다 다시 그려지니까, 소식 칸은 내용이 바뀔 때만 새로 그려요 (카드가 깜빡이지 않게). */
+var INSTA={post:'',account:''};
+var IG_RE=/instagram\.com\/(?:[A-Za-z0-9_.]+\/)?(p|reel|tv)\/([A-Za-z0-9_-]+)/;
+function igPost(u){var m=String(u||'').match(IG_RE);return m?'https://www.instagram.com/'+(m[1]==='tv'?'p':m[1])+'/'+m[2]+'/':''}
+function igAccount(u){u=String(u||'').trim();if(!u)return '';var m=u.match(/instagram\.com\/([A-Za-z0-9_.]+)/)||u.match(/^@?([A-Za-z0-9_.]+)\/?$/);return m&&!/^(p|reel|tv|stories|explore)$/.test(m[1])?'https://www.instagram.com/'+m[1]+'/':null}
+function newsKey(){return INSTA.post+'|'+INSTA.account+'|'+(S.admin?1:0)}
+/* 게시물 아래: [링크 칸 + 복사 아이콘] [인스타 로고 = 교구 계정 바로가기] (11-25 사용자 스케치대로) */
+function newsHTML(){
+  var acc=INSTA.account?'<a class="igbtn" href="'+esc(INSTA.account)+'" target="_blank" rel="noopener" aria-label="교구 인스타그램 열기">'+ICON.insta+'</a>':'';
+  var short=INSTA.post.replace(/^https?:\/\/(www\.)?/,'').replace(/\/$/,'');
+  return '<div class="sec-t"><h3 id="sec-news">생명소식</h3><button type="button" class="pill-btn" data-newsedit>'+(S.admin?ICON.pen:ICON.lock)+'게시물 바꾸기</button></div>'+
+    (INSTA.post?'<div class="news-card"><blockquote class="instagram-media" data-instgrm-permalink="'+esc(INSTA.post)+'?utm_source=ig_embed" data-instgrm-version="14"><a href="'+esc(INSTA.post)+'" target="_blank" rel="noopener">Instagram에서 게시물 보기</a></blockquote></div>'+
+      '<div class="news-act"><button type="button" class="linkbar" data-copylink aria-label="게시물 링크 복사"><span>'+esc(short)+'</span>'+ICON.copy+'</button>'+acc+'</div>'
+    :'<p class="empty news-empty">아직 올라온 소식이 없어요. 총무단이 인스타 게시물을 올리면 여기에 보여요.</p>'+(acc?'<div class="news-act news-only">'+acc+'</div>':''));
+}
+function loadInstaEmbed(){
+  if(!INSTA.post)return;
+  if(window.instgrm&&window.instgrm.Embeds){try{window.instgrm.Embeds.process()}catch(e){}return}
+  if(document.getElementById('ig-embed-js'))return;
+  var s=document.createElement('script');s.id='ig-embed-js';s.async=true;s.src='https://www.instagram.com/embed.js';document.body.appendChild(s);
+}
+function openInstaEditor(){
+  openSheet('<h2>생명소식 바꾸기</h2><p>인스타 게시물에서 ⋯ → <b>링크 복사</b>를 누른 뒤 붙여 넣어 주세요. 게시물이 바뀌면 리더들에게 “생명소식이 업데이트되었어요. 셀톡방에 공유해 주세요” 알림이 가요.</p>'+
+    '<form id="instaform" autocomplete="off">'+
+    '<div class="field"><label for="ig-post">게시물 링크</label><input id="ig-post" type="url" inputmode="url" value="'+esc(INSTA.post)+'" placeholder="https://www.instagram.com/p/…"></div>'+
+    '<div class="field"><label for="ig-acc">교구 계정 주소 (처음 한 번)</label><input id="ig-acc" inputmode="url" value="'+esc(INSTA.account)+'" placeholder="instagram.com/계정이름"></div>'+
+    '<p class="err-inline" id="ig-err" role="alert"></p>'+
+    '<div class="actions"><button type="button" class="btn" data-close>취소</button><button type="submit" class="btn primary">저장</button></div></form>');
+  setTimeout(function(){var i=$('#ig-post');i&&i.focus()},60);
+}
 function renderHome(){
   var nm=nextMeeting(),gap=dayDiff(TODAY,nm),kind=kindOf(nm);
   var head=gap===0?'오늘은 '+KIND[kind]+' 날이에요':KIND[kind]+'까지 '+gap+'일';
   var bs=weekBirthdays(),list=sortedNotices(),SHOWN=4;
   var shown=S.allNotices?list:list.slice(0,SHOWN);
-  main.innerHTML=
+  var top=
     '<div class="home-h"><div><p>'+md(TODAY)+' '+DOW[dowIdx(TODAY)]+'요일</p><h2>'+head+'</h2></div><button type="button" class="cta" data-gocheck>출석 체크'+ICON.arrow+'</button></div>'+
     '<div class="hrow">'+dayCardHTML(LIVE_URL?homeDay():lastMeetingOnOrBefore(TODAY))+
       '<section class="bdbox" aria-labelledby="sec-bday"><div class="bdbox-in"><div class="bdbox-h"><h3 id="sec-bday">이번 주 생일</h3><span>'+(bs.length?bs.length+'명':'')+'</span></div>'+
@@ -745,6 +790,9 @@ function renderHome(){
     '<section class="sec" aria-labelledby="sec-notice"><div class="sec-t"><h3 id="sec-notice">주요 일정</h3><button type="button" class="pill-btn" data-newnotice>'+(S.admin?ICON.pen:ICON.lock)+'일정 쓰기</button></div>'+
       '<div class="notices">'+(list.length?shown.map(noticeHTML).join(''):'<p class="empty">아직 등록된 일정이 없어요. 총무단이 일정을 올리면 여기에 보여요.</p>')+
       (list.length>SHOWN?'<button type="button" class="nt-more" data-allnotices>'+(S.allNotices?'접기':'일정 '+(list.length-SHOWN)+'개 더 보기')+'</button>':'')+'</div></section>';
+  var hTop=main.querySelector('#home-top'),hNews=main.querySelector('#home-news');
+  if(hTop&&hNews&&hNews.getAttribute('data-k')===newsKey())hTop.innerHTML=top;   /* 소식 칸은 그대로 두고 위쪽만 */
+  else{main.innerHTML='<div id="home-top">'+top+'</div><section class="sec" id="home-news" aria-labelledby="sec-news" data-k="'+esc(newsKey())+'">'+newsHTML()+'</section>';loadInstaEmbed()}
   /* fade the bottom of the birthday list while more names are hidden below */
   var bi=main.querySelector('.bdbox-in');
   if(bi){var upd=function(){bi.classList.toggle('more',bi.scrollTop+bi.clientHeight<bi.scrollHeight-4)};upd();bi.addEventListener('scroll',upd,{passive:true})}
@@ -775,7 +823,7 @@ function openNoticeEditor(id){
 }
 function openAdminLogin(next){
   S.afterAdmin=next;
-  openSheet('<h2>총무단 확인</h2><p>'+({'new':'일정 쓰기는','add':'새 사람 추가는'}[next]||(String(next).indexOf('person:')===0?'셀 이동은':'이 기능은'))+' 총무단만 할 수 있어요. 총무단 코드를 입력해 주세요.</p>'+
+  openSheet('<h2>총무단 확인</h2><p>'+({'new':'일정 쓰기는','add':'새 사람 추가는','insta':'생명소식 바꾸기는'}[next]||(String(next).indexOf('person:')===0?'셀 이동은':'이 기능은'))+' 총무단만 할 수 있어요. 총무단 코드를 입력해 주세요.</p>'+
     '<form id="adminform" autocomplete="off"><div class="field"><label for="admin-code">총무단 코드</label><input id="admin-code" type="password" autocapitalize="off" autocorrect="off" spellcheck="false"></div>'+
     '<p class="err-inline" id="admin-err" role="alert"></p>'+
     '<div class="actions"><button type="button" class="btn" data-close>취소</button><button type="submit" class="btn primary">확인</button></div></form>');
@@ -993,7 +1041,7 @@ function openInstall(){
   var al=upcomingAlerts(4);
   openSheet('<div class="homeicon">'+LOGO_SM('lgB')+'<span>생명교구</span></div>'+
     '<h2 style="text-align:center">알림과 앱 설치</h2>'+pushSection()+(LIVE_URL?'<h3>내 셀</h3><div class="setlist"><div class="setrow"><div><b>'+myCellName()+'</b><small>출석체크가 안 된 셀 알림(주일 오후 8:30)이 이 셀 기준으로 와요</small></div><button type="button" class="mini" data-mycell-open>바꾸기</button></div></div>':'')+
-    '<h3>알림</h3><div class="setlist">'+setRow('att','출석체크 알림','금요일 오후 10:30, 주일 오후 6:00'+(LIVE_URL?', 내 셀이 체크 전이면 주일 오후 8:30':''))+setRow('notice','일정 알림','날짜가 있는 일정은 하루 전 오후 8:00')+'</div>'+
+    '<h3>알림</h3><div class="setlist">'+setRow('att','출석체크 알림','금요일 오후 10:30, 주일 오후 6:00'+(LIVE_URL?', 내 셀이 체크 전이면 주일 오후 8:30':''))+setRow('notice','일정·소식 알림','날짜가 있는 일정은 하루 전 오후 8:00, 생명소식이 바뀌면 바로')+'</div>'+
     '<h3>예정된 알림</h3>'+(al.length?'<ul class="sched">'+al.map(function(x){return '<li><time>'+sd(x.d)+' ('+DOW[dowIdx(x.d)]+') '+t2k(x.t)+'</time><span>'+esc(x.what)+'</span></li>'}).join('')+'</ul>':'<p>켜진 알림이 없어요.</p>')+
     '<p class="note">알림은 앱을 홈 화면에 설치하고 "알림 허용"을 누른 휴대폰에만 와요. 아이폰은 iOS 16.4 이상이 필요해요. 알림 미리보기는 화면에서 보여주기만 해요.</p>'+
     '<h3>총무단 모드</h3><div class="setlist"><div class="setrow"><div><b>'+(S.admin?'켜짐':'꺼짐')+'</b><small>'+(S.admin?'이 기기에서 일정 쓰기, 새 사람 추가, 셀 이동을 할 수 있어요':'총무단 코드를 입력하면 일정 쓰기, 새 사람 추가, 셀 이동을 할 수 있어요')+'</small></div><button type="button" class="mini" data-admin-toggle>'+(S.admin?'끄기':'켜기')+'</button></div></div>'+
@@ -1005,7 +1053,7 @@ sheet.addEventListener('click',function(e){
   var t=e.target.closest('button');if(!t||t.disabled)return;
   if(t.hasAttribute('data-close')){closeSheet();return}
   if(t.hasAttribute('data-tg')){var k=t.getAttribute('data-tg');NOTIFY[k]=!NOTIFY[k];t.setAttribute('aria-checked',NOTIFY[k]);syncPushTags();
-    toast((k==='att'?'출석체크 알림':'일정 알림')+'을 '+(NOTIFY[k]?'켰어요':'껐어요'));openInstall();return}
+    toast((k==='att'?'출석체크 알림':'일정·소식 알림')+'을 '+(NOTIFY[k]?'켰어요':'껐어요'));openInstall();return}
   if(t.hasAttribute('data-preview')){previewPush(t.getAttribute('data-preview'));return}
   if(t.hasAttribute('data-push-enable')){enablePush();return}
   if(t.hasAttribute('data-admin-toggle')){if(S.admin){setAdmin(false);toast('총무단 모드를 껐어요');openInstall();if(S.tab==='home')renderHome()}else openAdminLogin('settings');return}
@@ -1031,7 +1079,7 @@ sheet.addEventListener('submit',function(e){
     var ac=$('#admin-code').value.trim().toLowerCase(),aerr=$('#admin-err');
     if(!ac){aerr.textContent='총무단 코드를 입력해 주세요.';return}
     var adminOk=function(){setAdmin(true);try{localStorage.setItem(ADMIN_KEY+'-code',ac)}catch(err){}toast('총무단 모드를 켰어요');if(S.tab==='home')renderHome();
-      var nx=String(S.afterAdmin||'');if(nx==='new')openNoticeEditor();else if(nx==='settings')openInstall();else if(nx==='add')openAdd();else if(nx.indexOf('person:')===0)openPerson(nx.slice(7));else closeSheet()};
+      var nx=String(S.afterAdmin||'');if(nx==='new')openNoticeEditor();else if(nx==='insta')openInstaEditor();else if(nx==='settings')openInstall();else if(nx==='add')openAdd();else if(nx.indexOf('person:')===0)openPerson(nx.slice(7));else closeSheet()};
     if(!LIVE_URL){adminOk();return}   /* 미리보기: 아무 코드나 */
     aerr.textContent='확인 중이에요…';
     apiPost({a:'admin_check',code:entryCode(),admin:ac}).then(function(res){if(res&&res.ok)adminOk();else{aerr.textContent='코드가 맞지 않아요. 다시 확인해 주세요.';var i=$('#admin-code');i&&i.select()}},
@@ -1044,6 +1092,15 @@ sheet.addEventListener('submit',function(e){
     else{nid++;data.id=LIVE_URL?'n'+Date.now():'n'+nid;data.created=TODAY;NOTICES.push(data);S.openNotice=data.id;if(LIVE_URL)liveQueue(Object.assign({a:'notice_save',admin:adminCode()},data));
       toast(data.date&&data.remind?'일정을 올렸어요. '+sd(addDays(data.date,-1))+' 오후 8시에 알림이 가요':'일정을 올렸어요')}
     closeSheet();if(S.tab==='home')renderHome();return}
+  if(e.target.id==='instaform'){e.preventDefault();
+    var rawP=$('#ig-post').value.trim(),rawA=$('#ig-acc').value.trim(),ierr=$('#ig-err');
+    var np=rawP?igPost(rawP):'',na=igAccount(rawA);
+    if(rawP&&!np){ierr.textContent='인스타그램 게시물 링크가 아니에요. 게시물의 “링크 복사”로 받은 주소를 넣어 주세요.';return}
+    if(na===null){ierr.textContent='교구 계정 주소를 확인해 주세요. 예: instagram.com/계정이름';return}
+    var changed=np&&np!==INSTA.post;
+    INSTA={post:np,account:na};
+    if(LIVE_URL)liveQueue({a:'insta_save',post:np,account:na,admin:adminCode()});
+    closeSheet();toast(changed?'생명소식을 바꿨어요. 리더들에게 알림이 가요':'저장했어요');if(S.tab==='home')renderHome();return}
   if(e.target.id!=='addform')return;e.preventDefault();
   var name=$('#add-name').value.trim();if(!name){$('#add-name').focus();return}
   var g=$('#add-group').value,gender=(sheet.querySelector('input[name="add-gender"]:checked')||{}).value||'여';
@@ -1079,6 +1136,10 @@ main.addEventListener('click',function(e){
   if(t.hasAttribute('data-notice')){var ni=t.getAttribute('data-notice');S.openNotice=S.openNotice===ni?null:ni;S.delArm=null;renderHome();return}
   if(t.hasAttribute('data-allnotices')){S.allNotices=!S.allNotices;renderHome();return}
   if(t.hasAttribute('data-newnotice')){if(S.admin)openNoticeEditor();else openAdminLogin('new');return}
+  if(t.hasAttribute('data-newsedit')){if(S.admin)openInstaEditor();else openAdminLogin('insta');return}
+  if(t.hasAttribute('data-copylink')){var lk=INSTA.post;
+    try{navigator.clipboard.writeText(lk).then(function(){toast('게시물 링크를 복사했어요. 셀톡방에 붙여 넣어 주세요')},function(){window.prompt('아래 링크를 길게 눌러 복사해 주세요',lk)})}catch(err){window.prompt('아래 링크를 길게 눌러 복사해 주세요',lk)}
+    return}
   if(t.hasAttribute('data-editnotice')){openNoticeEditor(t.getAttribute('data-editnotice'));return}
   if(t.hasAttribute('data-delnotice')){var di=t.getAttribute('data-delnotice');
     if(S.delArm===di){NOTICES=NOTICES.filter(function(x){return x.id!==di});if(LIVE_URL)liveQueue({a:'notice_del',id:di,admin:adminCode()});S.delArm=null;S.openNotice=null;toast('일정을 삭제했어요')}else S.delArm=di;
@@ -1165,6 +1226,7 @@ function liveApply(d){
   Object.keys(d.att||{}).forEach(function(dt){Object.keys(d.att[dt]).forEach(function(n){A[dt]=A[dt]||{};A[dt][n]=d.att[dt][n]})});
   LV.q.forEach(function(op){if(op.a==='mark'&&op.date.slice(0,7)===d.ym){var p={};if('svc' in op)p.svc=op.svc;if('cell' in op)p.cell=op.cell;put(op.date,op.name,p,true)}});
   NOTICES=d.notices||[];
+  if(d.insta)INSTA={post:d.insta.post||'',account:d.insta.account||''};
   LV.loaded[d.ym]=Date.now();
 }
 /* 마지막으로 받은 달 내용을 폰에 남겨 두고, 다음에 앱을 열면 먼저 보여준 뒤 서버 내용으로 바꿔요 (연락처는 남기지 않음) */
