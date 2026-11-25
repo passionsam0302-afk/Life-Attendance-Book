@@ -763,7 +763,7 @@ function loadInstaEmbed(){
   var s=document.createElement('script');s.id='ig-embed-js';s.async=true;s.src='https://www.instagram.com/embed.js';document.body.appendChild(s);
 }
 function openInstaEditor(){
-  openSheet('<h2>생명소식 바꾸기</h2><p>인스타 게시물에서 ⋯ → <b>링크 복사</b>를 누른 뒤 붙여 넣어 주세요. 게시물이 바뀌면 리더들에게 “생명소식이 업데이트되었어요. 셀톡방에 공유해 주세요” 알림이 가요.</p>'+
+  openSheet('<h2>생명소식 바꾸기</h2><p>인스타 게시물 아래 <b>공유(종이비행기)</b> → <b>링크 복사</b>를 누른 뒤 붙여 넣어 주세요. 링크 복사가 안 보이면 버튼 줄을 옆으로 밀어 보세요. 게시물이 바뀌면 리더들에게 “생명소식이 업데이트되었어요. 셀톡방에 공유해 주세요” 알림이 가요.</p>'+
     '<form id="instaform" autocomplete="off">'+
     '<div class="field"><label for="ig-post">게시물 링크</label><input id="ig-post" type="url" inputmode="url" value="'+esc(INSTA.post)+'" placeholder="https://www.instagram.com/p/…"></div>'+
     '<p class="err-inline" id="ig-err" role="alert"></p>'+
@@ -1092,7 +1092,7 @@ sheet.addEventListener('submit',function(e){
   if(e.target.id==='instaform'){e.preventDefault();
     var rawP=$('#ig-post').value.trim(),ierr=$('#ig-err');
     var np=rawP?igPost(rawP):'',na=INSTA.account||'';   /* 계정 주소 칸은 뺐음 (서버에 있던 값은 그대로) */
-    if(rawP&&!np){ierr.textContent='인스타그램 게시물 링크가 아니에요. 게시물의 “링크 복사”로 받은 주소를 넣어 주세요.';return}
+    if(rawP&&!np){ierr.textContent='인스타그램 게시물 링크가 아니에요. 게시물 아래 공유 → “링크 복사”로 받은 주소를 넣어 주세요.';return}
     var changed=np&&np!==INSTA.post;
     INSTA={post:np,account:na};
     if(LIVE_URL)liveQueue({a:'insta_save',post:np,account:na,admin:adminCode()});
