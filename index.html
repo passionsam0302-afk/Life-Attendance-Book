@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>생명교구 출석부</title>
-<meta name="theme-color" content="#F4F5F0">
+<meta name="theme-color" content="#FAF7EE">
 <meta name="description" content="생명교구 출석 체크, 주요 일정, 이번 주 생일">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
@@ -444,17 +444,20 @@ button{cursor:pointer}
 /* colour: lighter green. The attendance card, week board and entry screen become a pale sage field with dark green ink;
    the action green is a touch lighter. Dark mode keeps a deep field so it does not glare at night. */
 /* one sage family: neutrals lean slightly green, the accent is a mid sage-forest, blue and gold are dusty so nothing shouts */
+/* 11-25: warm ivory ground (사용자 요청 "아이보리, 녹색이랑 잘 어울리게"); cards are a near-white cream, the sage field stays green */
 :root{
-  --ground:#F4F5F0; --surface:#FFFFFF; --surface-2:#ECEFE8; --line:#E0E5DC;
-  --ink:#1C2A21; --ink-2:#4F5E55; --ink-3:#66726A;
-  --leaf:#3B7D57; --leaf-ink:#FFFFFF; --leaf-soft:#E3EFE6;
-  --sky:#4D72A6; --sky-ink:#FFFFFF; --sky-soft:#E5ECF5;
-  --gold:#946B22; --gold-ink:#FFFFFF; --gold-soft:#F3EBDA;
-  --deep:#E5EFE7; --deep-hi:#D3E5D8; --deep-lo:#DCEADF;
+  --ground:#FAF7EE; --surface:#FFFDF8; --surface-2:#F2EEE2; --line:#E7E1D2;
+  --ink:#1C2A21; --ink-2:#4F5A50; --ink-3:#6B7067;
+  --leaf:#3B7D57; --leaf-ink:#FFFFFF; --leaf-soft:#E4EEDF;
+  --sky:#4D72A6; --sky-ink:#FFFFFF; --sky-soft:#E7ECF2;
+  --gold:#946B22; --gold-ink:#FFFFFF; --gold-soft:#F4EBD6;
+  --deep:#E8F0E2; --deep-hi:#D6E6D5; --deep-lo:#DFEBDB;
+  --card-ivory:#FFFDF8;
   --deep-ink:#1E3B2A; --deep-2:#4B6756; --deep-line:rgba(30,59,42,.12); --deep-fill:rgba(30,59,42,.05);
   --b-site:#3B7D57; --b-online:#6C8FC2; --b-main:#C9A052; --b-cell:#1E3B2A;
 }
 .bdcell{color:var(--ink-3)}
+.gate{background:var(--ground)}
 .daycard,.board{box-shadow:inset 0 0 0 1px var(--deep-line)}
 /* mobile: iPhone zooms into any text field under 16px, so every field is 16px */
 .search input,.field input,.field select,.field textarea{font-size:16px}
@@ -618,6 +621,11 @@ if(!LIVE_URL)(function seed(){
 
 /* ---------- state ---------- */
 function lastMeetingOnOrBefore(k){var d=k;for(var i=0;i<8;i++){if(kindOf(d)!=='etc')return d;d=addDays(d,-1)}return k}
+/* 출석 탭을 열면 먼저 보여줄 모임 (11-25 사용자 요청):
+   수요일 ~ 토요일 오전 → 그 주 금요철야, 토요일 낮 12시 ~ 화요일 → 그 사이 주일예배 */
+function focusMeeting(){var g=dowIdx(TODAY),h=new Date().getHours();
+  if(g>=3&&g<=5||(g===6&&h<12))return addDays(weekStart(TODAY),5);
+  return g===6?addDays(TODAY,1):addDays(TODAY,-g)}
 var S={tab:'home',date:lastMeetingOnOrBefore(TODAY),group:'all',q:'',rg:'all',rq:'',smeasure:'sunTotal'};
 S.month=S.date.slice(0,7);
 
@@ -1064,7 +1072,7 @@ main.addEventListener('click',function(e){
   if(t.hasAttribute('data-delnotice')){var di=t.getAttribute('data-delnotice');
     if(S.delArm===di){NOTICES=NOTICES.filter(function(x){return x.id!==di});if(LIVE_URL)liveQueue({a:'notice_del',id:di,admin:adminCode()});S.delArm=null;S.openNotice=null;toast('일정을 삭제했어요')}else S.delArm=di;
     renderHome();return}
-  if(t.hasAttribute('data-gocheck')){var nm0=nextMeeting();if(nm0===TODAY)S.date=TODAY;go('check');return}
+  if(t.hasAttribute('data-gocheck')){S.date=focusMeeting();clampDates();go('check');return}
   if(t.hasAttribute('data-date')){var nd0=t.getAttribute('data-date');if(S.tab==='home'){S.date=nd0;go('check');return}
     if(S.date===nd0)return;S.date=nd0;renderCheck();return}
   if(t.hasAttribute('data-week')){
@@ -1090,7 +1098,9 @@ $('#installBtn').addEventListener('click',openInstall);
 /* ---------- tabs ---------- */
 function go(tab){S.tab=tab;Array.prototype.forEach.call(document.querySelectorAll('.nav button'),function(b){if(b.getAttribute('data-tab')===tab)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')});render();window.scrollTo(0,0)}
 function render(){if(LIVE_URL&&!liveReady()){liveEnsure();return}if(S.tab==='home')renderHome();else if(S.tab==='check')renderCheck();else if(S.tab==='stats')renderStats();else renderRoster()}
-document.querySelector('.nav').addEventListener('click',function(e){var b=e.target.closest('[data-tab]');if(b)go(b.getAttribute('data-tab'))});
+document.querySelector('.nav').addEventListener('click',function(e){var b=e.target.closest('[data-tab]');if(!b)return;var tb=b.getAttribute('data-tab');
+  if(tb==='check'&&S.tab!=='check'){S.date=focusMeeting();clampDates()}   /* 다른 탭에서 출석으로 오면 지금 가장 관련 있는 모임부터 */
+  go(tb)});
 
 /* ---------- live: load from the sheet, save queue (works offline), my cell ---------- */
 var LV={loaded:{},loading:{},dates:{},months:[],busy:false,q:[],err:0};
