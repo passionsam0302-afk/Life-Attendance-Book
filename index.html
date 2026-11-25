@@ -747,16 +747,14 @@ function noticeHTML(n){
 var INSTA={post:'',account:''};
 var IG_RE=/instagram\.com\/(?:[A-Za-z0-9_.]+\/)?(p|reel|tv)\/([A-Za-z0-9_-]+)/;
 function igPost(u){var m=String(u||'').match(IG_RE);return m?'https://www.instagram.com/'+(m[1]==='tv'?'p':m[1])+'/'+m[2]+'/':''}
-function igAccount(u){u=String(u||'').trim();if(!u)return '';var m=u.match(/instagram\.com\/([A-Za-z0-9_.]+)/)||u.match(/^@?([A-Za-z0-9_.]+)\/?$/);return m&&!/^(p|reel|tv|stories|explore)$/.test(m[1])?'https://www.instagram.com/'+m[1]+'/':null}
 function newsKey(){return INSTA.post+'|'+INSTA.account+'|'+(S.admin?1:0)}
-/* 게시물 아래: [링크 칸 + 복사 아이콘] [인스타 로고 = 교구 계정 바로가기] (11-25 사용자 스케치대로) */
+/* 게시물 아래: 링크 칸 + 복사 아이콘 한 줄 (11-25: 카드 위에 '프로필 보기'가 있어서 계정 바로가기 버튼은 뺌) */
 function newsHTML(){
-  var acc=INSTA.account?'<a class="igbtn" href="'+esc(INSTA.account)+'" target="_blank" rel="noopener" aria-label="교구 인스타그램 열기">'+ICON.insta+'</a>':'';
   var short=INSTA.post.replace(/^https?:\/\/(www\.)?/,'').replace(/\/$/,'');
   return '<div class="sec-t"><h3 id="sec-news">생명소식</h3><button type="button" class="pill-btn" data-newsedit>'+(S.admin?ICON.pen:ICON.lock)+'게시물 바꾸기</button></div>'+
     (INSTA.post?'<div class="news-card"><blockquote class="instagram-media" data-instgrm-permalink="'+esc(INSTA.post)+'?utm_source=ig_embed" data-instgrm-version="14"><a href="'+esc(INSTA.post)+'" target="_blank" rel="noopener">Instagram에서 게시물 보기</a></blockquote></div>'+
-      '<div class="news-act"><button type="button" class="linkbar" data-copylink aria-label="게시물 링크 복사"><span>'+esc(short)+'</span>'+ICON.copy+'</button>'+acc+'</div>'
-    :'<p class="empty news-empty">아직 올라온 소식이 없어요. 총무단이 인스타 게시물을 올리면 여기에 보여요.</p>'+(acc?'<div class="news-act news-only">'+acc+'</div>':''));
+      '<div class="news-act"><button type="button" class="linkbar" data-copylink aria-label="게시물 링크 복사"><span>'+esc(short)+'</span>'+ICON.copy+'</button></div>'
+    :'<p class="empty news-empty">아직 올라온 소식이 없어요. 총무단이 인스타 게시물을 올리면 여기에 보여요.</p>');
 }
 function loadInstaEmbed(){
   if(!INSTA.post)return;
@@ -768,7 +766,6 @@ function openInstaEditor(){
   openSheet('<h2>생명소식 바꾸기</h2><p>인스타 게시물에서 ⋯ → <b>링크 복사</b>를 누른 뒤 붙여 넣어 주세요. 게시물이 바뀌면 리더들에게 “생명소식이 업데이트되었어요. 셀톡방에 공유해 주세요” 알림이 가요.</p>'+
     '<form id="instaform" autocomplete="off">'+
     '<div class="field"><label for="ig-post">게시물 링크</label><input id="ig-post" type="url" inputmode="url" value="'+esc(INSTA.post)+'" placeholder="https://www.instagram.com/p/…"></div>'+
-    '<div class="field"><label for="ig-acc">교구 계정 주소 (처음 한 번)</label><input id="ig-acc" inputmode="url" value="'+esc(INSTA.account)+'" placeholder="instagram.com/계정이름"></div>'+
     '<p class="err-inline" id="ig-err" role="alert"></p>'+
     '<div class="actions"><button type="button" class="btn" data-close>취소</button><button type="submit" class="btn primary">저장</button></div></form>');
   setTimeout(function(){var i=$('#ig-post');i&&i.focus()},60);
@@ -1093,10 +1090,9 @@ sheet.addEventListener('submit',function(e){
       toast(data.date&&data.remind?'일정을 올렸어요. '+sd(addDays(data.date,-1))+' 오후 8시에 알림이 가요':'일정을 올렸어요')}
     closeSheet();if(S.tab==='home')renderHome();return}
   if(e.target.id==='instaform'){e.preventDefault();
-    var rawP=$('#ig-post').value.trim(),rawA=$('#ig-acc').value.trim(),ierr=$('#ig-err');
-    var np=rawP?igPost(rawP):'',na=igAccount(rawA);
+    var rawP=$('#ig-post').value.trim(),ierr=$('#ig-err');
+    var np=rawP?igPost(rawP):'',na=INSTA.account||'';   /* 계정 주소 칸은 뺐음 (서버에 있던 값은 그대로) */
     if(rawP&&!np){ierr.textContent='인스타그램 게시물 링크가 아니에요. 게시물의 “링크 복사”로 받은 주소를 넣어 주세요.';return}
-    if(na===null){ierr.textContent='교구 계정 주소를 확인해 주세요. 예: instagram.com/계정이름';return}
     var changed=np&&np!==INSTA.post;
     INSTA={post:np,account:na};
     if(LIVE_URL)liveQueue({a:'insta_save',post:np,account:na,admin:adminCode()});
