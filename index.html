@@ -854,10 +854,11 @@ function showPush(title,body){var p=$('#push');
   p.classList.remove('show');void p.offsetWidth;p.classList.add('show');clearTimeout(pushT);pushT=setTimeout(function(){p.classList.remove('show')},5200)}
 document.getElementById('push').addEventListener('click',function(){this.classList.remove('show')});
 function previewPush(k){
-  if(k==='att'){var nm=nextMeeting();showPush('출석체크 부탁드립니다~!',md(nm)+' '+KIND[kindOf(nm)]+' 출석을 앱에 기록해 주세요.');return}
+  /* 11-25: 서버가 실제로 보내는 문구와 똑같이 */
+  if(k==='att'){var nm=nextMeeting();showPush('생명교구 · '+KIND[kindOf(nm)],'출석체크 부탁드립니다~!');return}
   var nx=NOTICES.filter(function(x){return x.date&&x.remind&&x.date>=TODAY}).sort(function(a,b){return a.date<b.date?-1:1})[0];
-  if(!nx){toast('알림을 보낼 날짜 있는 일정이 없어요');return}
-  showPush('내일: '+nx.title,nx.body.split('\n')[0]);
+  if(!nx){showPush('생명교구 · 생명소식','생명소식이 업데이트되었어요. 셀톡방에 공유해 주세요 🙌');return}
+  showPush('생명교구 · 내일 일정',nx.title);
 }
 
 /* ---------- check tab ---------- */
@@ -951,11 +952,16 @@ function renderRoster(){
     '<div class="chips scrollx">'+chipHTML(S.rg,'rg')+'</div><div class="plist" id="plist" style="margin-top:6px"></div>';
   renderPlist();
 }
+/* 소속·역할 한 줄 (11-25): "총무단, 새가족" 그룹은 총무단인지 새가족인지 먼저 보이게 → "새가족", "총무단 · 선임총무", "3셀 · 셀리더" */
+function whoLabel(m){
+  if(m.group==='staff'){var nf=m.role==='새가족'||m.section==='새가족';return nf?'새가족':'총무단'+(m.role&&m.role!=='총무단'?' · '+m.role:'')}
+  var g=gOf(m.group);return (g?g.name:'')+(m.role?' · '+m.role:'');
+}
 function renderPlist(){
   var box=$('#plist');if(!box)return;
   var list=orderMembers(M.filter(function(m){return(S.rg==='all'||m.group===S.rg)&&(!S.rq||m.name.indexOf(S.rq)>-1)}));
   box.innerHTML=list.length?list.map(function(m){var g=gOf(m.group);
-    return '<button type="button" class="person" data-person="'+m.id+'"><span class="av'+(m.role==='새가족'?' new':'')+'">'+m.name.charAt(0)+'</span><span class="pinfo"><b>'+m.name+'</b><small>'+g.name+(m.role?', '+m.role:'')+(m.gen?', '+m.gen+'기':'')+'</small></span></button>'}).join('')   /* 11-25: 이번 달 횟수·점 표시는 사용자 요청으로 뺌 */
+    return '<button type="button" class="person" data-person="'+m.id+'"><span class="av'+(m.role==='새가족'?' new':'')+'">'+m.name.charAt(0)+'</span><span class="pinfo"><b>'+m.name+'</b><small>'+esc(whoLabel(m))+(m.gen?' · '+m.gen+'기':'')+'</small></span></button>'}).join('')   /* 11-25: 이번 달 횟수·점 표시는 사용자 요청으로 뺌 */
     :'<p class="empty">찾는 이름이 없어요. 오른쪽 위 ‘새 사람 추가’로 등록할 수 있어요.</p>';
 }
 
@@ -973,7 +979,7 @@ function openPerson(id){
       if(k==='sun'){p+=r.svc?'<span class="pill '+r.svc+'">'+svcText('sun',r.svc)+'</span>':'<span class="pill">예배 없음</span>';p+=r.cell?'<span class="pill cell">셀모임</span>':''}
       else p=r.svc?'<span class="pill '+r.svc+'">'+KIND[k]+' '+SVC_LABEL[r.svc]+'</span>':'<span class="pill">'+KIND[k]+' 없음</span>';
       return '<div class="rec-row"><span>'+sd(d)+' '+DOW[dowIdx(d)]+'</span><div class="pills">'+p+'</div></div>'}).join('');
-  openSheet('<div class="p-top"><span class="av lg'+(m.role==='새가족'?' new':'')+'">'+m.name.charAt(0)+'</span><div><h2>'+m.name+'</h2><p>'+g.name+(m.role?', '+m.role:'')+'</p></div></div>'+
+  openSheet('<div class="p-top"><span class="av lg'+(m.role==='새가족'?' new':'')+'">'+m.name.charAt(0)+'</span><div><h2>'+m.name+'</h2><p>'+esc(whoLabel(m))+'</p></div></div>'+
     '<dl class="facts"><div><dt>성별</dt><dd>'+m.gender+'</dd></div><div><dt>기수</dt><dd>'+(m.gen?m.gen+'기':'미정')+'</dd></div><div><dt>생년월일</dt><dd>'+esc(m.birth||'미입력')+'</dd></div></dl>'+
     (function(){var p=m.phone||'',dg=p.replace(/[^0-9]/g,'');
       return '<div class="phone"><div><span>연락처</span><b>'+(p?esc(p):'미입력')+'</b></div>'+(p?'<a class="pbtn" href="tel:'+dg+'">전화</a><a class="pbtn" href="sms:'+dg+'">문자</a><button type="button" class="pbtn" data-copy="'+esc(p)+'">복사</button>':'')+'</div>'})()+
