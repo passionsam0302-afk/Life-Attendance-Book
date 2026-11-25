@@ -489,6 +489,17 @@ button{cursor:pointer}
   --b-site:#86D3A2; --b-online:#A3BEF0; --b-main:#E6BC62; --b-cell:#EAF3EC;
 }
 .wk .now{color:var(--leaf)}
+/* 총무단 도구 (11-25) */
+.devstats li{grid-template-columns:minmax(0,1fr) auto}
+.devstats li span:last-child{color:var(--ink);font-variant-numeric:tabular-nums}
+.devstats li small{color:var(--ink-3);font-size:12px;margin-left:4px}
+.devstats .zero{color:var(--ink-3)!important}
+.devstats .tot span{font-weight:600}
+.pn-count{align-self:flex-end;font-size:12px;color:var(--ink-3)}
+.push-prev{display:flex;flex-direction:column;gap:2px;margin-top:12px;background:var(--surface-2);border-radius:14px;padding:10px 14px;font-size:13.5px;color:var(--ink-2)}
+.push-prev b{font-size:13px;color:var(--ink)}
+.push-prev span{white-space:pre-wrap;word-break:break-word}
+.btn.primary.danger{background:var(--danger);color:#fff}
 /* 생명소식 (인스타, 11-25). 카드는 화면 폭 가득 (270px로 줄여 봤다가 사용자 요청으로 원래대로) */
 .news-card .instagram-media{background:#fff!important;border:0!important;border-radius:14px!important;margin:0!important;max-width:100%!important;min-width:0!important;width:100%!important;box-shadow:none!important;padding:0!important}
 .news-card iframe{border-radius:14px!important;max-width:100%!important;min-width:0!important}
@@ -1030,10 +1041,46 @@ function enablePush(){
   if(/iPhone|iPad|iPod/.test(navigator.userAgent)&&!isStandalone()){toast('아이폰은 홈 화면에 추가한 앱에서 켤 수 있어요');return}
   window.OneSignalDeferred.push(async function(OS){
     try{await OS.Notifications.requestPermission()}catch(e){}
-    var p=pushPerm();if(p==='granted')syncPushTags();toast(p==='granted'?'알림을 켰어요':'알림이 허용되지 않았어요. 폰 설정에서 바꿀 수 있어요');
+    var p=pushPerm();if(p==='granted')syncPushTags();sayHello();toast(p==='granted'?'알림을 켰어요':'알림이 허용되지 않았어요. 폰 설정에서 바꿀 수 있어요');
     if(!sheet.hidden)openInstall();
   });
 }
+/* ---------- 총무단 도구 (11-25): 앱 등록 현황 · 알림 보내기 ----------
+   앱을 열 때 이 폰의 임의 번호·내 셀·알림 허용 여부만 서버에 알려요(이름·연락처 없음). 숫자는 총무단 코드가 맞을 때만 받아요. */
+var DEV_KEY='saengmyeong-dev';
+function devId(){try{var v=localStorage.getItem(DEV_KEY);if(!v){v=Math.random().toString(36).slice(2,10)+Date.now().toString(36);localStorage.setItem(DEV_KEY,v)}return v}catch(e){return ''}}
+function sayHello(){if(!LIVE_URL||!passed())return;try{apiPost({a:'hello',code:entryCode(),dev:devId(),cell:myCell(),push:pushPerm()==='granted'}).catch(function(){})}catch(e){}}
+var DEV_ROWS=[['staff','총무단, 새가족'],['c1','1셀'],['c2','2셀'],['c3','3셀'],['c4','4셀'],['c5','5셀'],['c6','6셀'],['none','내 셀 안 고름']];
+function devStatsHTML(d){
+  var c=d.cells,tn=0,tp=0;DEV_ROWS.forEach(function(r){tn+=c[r[0]].n;tp+=c[r[0]].p});
+  return '<ul class="sched devstats">'+DEV_ROWS.filter(function(r){return r[0]!=='none'||c.none.n}).map(function(r){var x=c[r[0]],g=gOf(r[0]);
+      return '<li><span>'+r[1]+(g&&g.leader?' <small>'+esc(g.leader)+'</small>':'')+'</span><span class="'+(x.n?'':'zero')+'">'+(x.n?'폰 '+x.n+'대 · 알림 '+x.p:'아직 없음')+'</span></li>'}).join('')+
+    '<li class="tot"><span>합계</span><span>폰 '+tn+'대 · 알림 '+tp+'</span></li></ul>'+
+    '<p class="note">최근 '+d.days+'일 안에 앱을 연 폰 수예요. 사람 수가 아니라 폰 수라서, 한 사람이 폰 두 대로 열면 2대로 세요. "알림"은 알림을 허용한 폰이에요.</p>';
+}
+function openDevStats(){
+  openSheet('<h2>앱 등록 현황</h2><div id="devbox"><p class="empty">불러오는 중이에요…</p></div><div class="actions"><button type="button" class="btn" data-back-install>뒤로</button><button type="button" class="btn primary" data-close>닫기</button></div>');
+  function show(d){var b=$('#devbox');if(b)b.innerHTML=devStatsHTML(d)}
+  if(!LIVE_URL){show({days:30,cells:{staff:{n:3,p:2},c1:{n:2,p:2},c2:{n:0,p:0},c3:{n:1,p:1},c4:{n:2,p:1},c5:{n:0,p:0},c6:{n:1,p:0},none:{n:1,p:0}}});return}
+  apiPost({a:'devices',code:entryCode(),admin:adminCode()}).then(function(res){
+    if(res&&res.ok)show(res.devices);else{var b=$('#devbox');if(b)b.innerHTML='<p class="empty">'+esc((res&&res.error)||'불러오지 못했어요')+'</p>';if(res&&res.admin)setAdmin(false)}
+  },function(){var b=$('#devbox');if(b)b.innerHTML='<p class="empty">인터넷 연결을 확인해 주세요.</p>'});
+}
+function openPushNow(){
+  openSheet('<h2>알림 보내기</h2><p>보내기를 누르고 한 번 더 확인하면 바로 알림이 가요. 알림을 허용한 폰에만 가요.</p>'+
+    '<form id="pushform" autocomplete="off">'+
+    '<div class="field"><label for="pn-target">받는 사람</label><select id="pn-target"><option value="all">전체</option>'+GROUPS.map(function(g){return '<option value="'+g.id+'">'+g.name+(g.leader?' ('+esc(g.leader)+')':'')+'</option>'}).join('')+'</select></div>'+
+    '<div class="field"><label for="pn-body">내용</label><textarea id="pn-body" maxlength="200" placeholder="예: 오늘 셀모임은 교육관 4층에서 모여요"></textarea><span class="pn-count" id="pn-count">0 / 200</span></div>'+
+    '<div class="push-prev"><b>생명교구 · 총무단</b><span id="pn-prev">여기에 쓴 내용이 알림으로 보여요</span></div>'+
+    '<p class="err-inline" id="pn-err" role="alert"></p>'+
+    '<div class="actions"><button type="button" class="btn" data-back-install>취소</button><button type="submit" class="btn primary" id="pn-send">보내기</button></div></form>');
+  setTimeout(function(){var i=$('#pn-body');i&&i.focus()},60);
+}
+sheet.addEventListener('input',function(e){
+  if(e.target.id==='pn-body'){var v=e.target.value;$('#pn-count').textContent=v.length+' / 200';$('#pn-prev').textContent=v.trim()||'여기에 쓴 내용이 알림으로 보여요';disarmPush()}
+});
+sheet.addEventListener('change',function(e){if(e.target.id==='pn-target')disarmPush()});
+function disarmPush(){var f=$('#pushform'),b=$('#pn-send');if(f&&f.getAttribute('data-arm')){f.removeAttribute('data-arm');b.textContent='보내기';b.classList.remove('danger')}}
 function openInstall(){
   var al=upcomingAlerts(4);
   openSheet('<div class="homeicon">'+LOGO_SM('lgB')+'<span>생명교구</span></div>'+
@@ -1042,6 +1089,9 @@ function openInstall(){
     '<h3>예정된 알림</h3>'+(al.length?'<ul class="sched">'+al.map(function(x){return '<li><time>'+sd(x.d)+' ('+DOW[dowIdx(x.d)]+') '+t2k(x.t)+'</time><span>'+esc(x.what)+'</span></li>'}).join('')+'</ul>':'<p>켜진 알림이 없어요.</p>')+
     '<p class="note">알림은 앱을 홈 화면에 설치하고 "알림 허용"을 누른 휴대폰에만 와요. 아이폰은 iOS 16.4 이상이 필요해요. 알림 미리보기는 화면에서 보여주기만 해요.</p>'+
     '<h3>총무단 모드</h3><div class="setlist"><div class="setrow"><div><b>'+(S.admin?'켜짐':'꺼짐')+'</b><small>'+(S.admin?'이 기기에서 일정 쓰기, 새 사람 추가, 셀 이동을 할 수 있어요':'총무단 코드를 입력하면 일정 쓰기, 새 사람 추가, 셀 이동을 할 수 있어요')+'</small></div><button type="button" class="mini" data-admin-toggle>'+(S.admin?'끄기':'켜기')+'</button></div></div>'+
+    (S.admin?'<h3>총무단 도구</h3><div class="setlist">'+
+      '<div class="setrow"><div><b>앱 등록 현황</b><small>셀별로 앱을 연 폰과 알림을 켠 폰 수 (최근 30일)</small></div><button type="button" class="mini" data-devstats>보기</button></div>'+
+      '<div class="setrow"><div><b>알림 보내기</b><small>쓴 문구를 지금 바로 리더들 폰으로 보내요</small></div><button type="button" class="mini" data-pushnow>쓰기</button></div></div>':'')+
     '<h3>아이폰에 설치</h3><ol class="steps"><li>받은 링크를 <b>Safari</b>로 열어요. 카카오톡 안에서 열렸다면 오른쪽 아래 메뉴에서 ‘다른 브라우저로 열기’를 눌러요.</li><li>화면 아래 <b>공유</b> 버튼을 눌러요.</li><li><b>홈 화면에 추가</b>를 누르면 끝이에요.</li></ol>'+
     '<h3>안드로이드에 설치</h3><ol class="steps"><li>받은 링크를 <b>Chrome</b>으로 열어요.</li><li>화면에 뜨는 <b>앱 설치</b>를 누르거나, 오른쪽 위 메뉴에서 <b>홈 화면에 추가</b>를 눌러요.</li></ol>'+
     '<div class="actions"><button type="button" class="btn primary" data-close>확인</button></div>');
@@ -1053,8 +1103,11 @@ sheet.addEventListener('click',function(e){
     toast((k==='att'?'출석체크 알림':'일정·소식 알림')+'을 '+(NOTIFY[k]?'켰어요':'껐어요'));openInstall();return}
   if(t.hasAttribute('data-preview')){previewPush(t.getAttribute('data-preview'));return}
   if(t.hasAttribute('data-push-enable')){enablePush();return}
+  if(t.hasAttribute('data-devstats')){openDevStats();return}
+  if(t.hasAttribute('data-pushnow')){openPushNow();return}
+  if(t.hasAttribute('data-back-install')){openInstall();return}
   if(t.hasAttribute('data-admin-toggle')){if(S.admin){setAdmin(false);toast('총무단 모드를 껐어요');openInstall();if(S.tab==='home')renderHome()}else openAdminLogin('settings');return}
-  if(t.hasAttribute('data-mycell')){try{localStorage.setItem(CELL_KEY,t.getAttribute('data-mycell'))}catch(err){}syncPushTags();closeSheet();toast('내 셀을 '+withRo(myCellName())+' 정했어요');return}
+  if(t.hasAttribute('data-mycell')){try{localStorage.setItem(CELL_KEY,t.getAttribute('data-mycell'))}catch(err){}syncPushTags();sayHello();closeSheet();toast('내 셀을 '+withRo(myCellName())+' 정했어요');return}
   if(t.hasAttribute('data-mycell-open')){askMyCell(true);return}
   if(t.hasAttribute('data-unlock')){openAdminLogin('person:'+t.getAttribute('data-unlock'));return}
   if(t.hasAttribute('data-copy')){var num=t.getAttribute('data-copy');
@@ -1089,6 +1142,19 @@ sheet.addEventListener('submit',function(e){
     else{nid++;data.id=LIVE_URL?'n'+Date.now():'n'+nid;data.created=TODAY;NOTICES.push(data);S.openNotice=data.id;if(LIVE_URL)liveQueue(Object.assign({a:'notice_save',admin:adminCode()},data));
       toast(data.date&&data.remind?'일정을 올렸어요. '+sd(addDays(data.date,-1))+' 오후 8시에 알림이 가요':'일정을 올렸어요')}
     closeSheet();if(S.tab==='home')renderHome();return}
+  if(e.target.id==='pushform'){e.preventDefault();
+    var pf=e.target,pb=$('#pn-body').value.trim(),pt=$('#pn-target').value,perr=$('#pn-err'),btn=$('#pn-send');
+    var who=pt==='all'?'전체':gOf(pt).name;
+    if(!pb){perr.textContent='보낼 내용을 적어 주세요.';$('#pn-body').focus();return}
+    perr.textContent='';
+    if(!pf.getAttribute('data-arm')){pf.setAttribute('data-arm','1');btn.textContent='확인 · 보내기';btn.classList.add('danger');perr.textContent=who+'에 보내요. 한 번 더 누르면 바로 가고, 보낸 알림은 되돌릴 수 없어요.';return}
+    if(!LIVE_URL){closeSheet();toast('미리보기라 실제로 보내지는 않았어요 ('+who+')');return}
+    btn.disabled=true;btn.textContent='보내는 중…';
+    apiPost({a:'push_send',code:entryCode(),admin:adminCode(),target:pt,body:pb}).then(function(res){
+      if(res&&res.ok){closeSheet();toast(who+'에 알림을 보냈어요')}
+      else{btn.disabled=false;disarmPush();perr.textContent=(res&&res.error)||'보내지 못했어요';if(res&&res.admin)setAdmin(false)}
+    },function(){btn.disabled=false;disarmPush();perr.textContent='인터넷 연결을 확인해 주세요.'});
+    return}
   if(e.target.id==='instaform'){e.preventDefault();
     var rawP=$('#ig-post').value.trim(),ierr=$('#ig-err');
     var np=rawP?igPost(rawP):'',na=INSTA.account||'';   /* 계정 주소 칸은 뺐음 (서버에 있던 값은 그대로) */
@@ -1240,7 +1306,7 @@ function liveStart(){
   syncBadge();
   main.innerHTML='<p class="empty">출석부를 불러오는 중이에요…</p>';
   var snap=loadSnap(viewYm());if(snap&&snap.ym===viewYm()){liveApply(snap);clampDates();renderSafe()}
-  liveLoad(viewYm()).then(function(d){if(!d)return;clampDates();if(!liveReady())liveEnsure();else renderSafe();if(passed())askMyCell()});
+  liveLoad(viewYm()).then(function(d){if(!d)return;clampDates();if(!liveReady())liveEnsure();else renderSafe();if(passed())askMyCell();sayHello()});
   setInterval(function(){if(document.hidden)return;liveFlush();liveLoad(viewYm()).then(function(d){if(d)renderSafe()})},20000);
   document.addEventListener('visibilitychange',function(){if(!document.hidden){liveFlush();liveLoad(viewYm()).then(function(d){if(d)renderSafe()})}});
   window.addEventListener('online',liveFlush);
