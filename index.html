@@ -1135,8 +1135,11 @@ sheet.addEventListener('click',function(e){
   if(t.hasAttribute('data-role')){var inp=$('#'+t.getAttribute('data-for'));var r0=t.getAttribute('data-role');inp.value=inp.value.trim()===r0?'':r0;return}
   if(t.hasAttribute('data-save')&&!canEdit((byId(t.getAttribute('data-save'))||{}).group)){toast(roMsg());closeSheet();return}
   if(t.hasAttribute('data-save')){var id=t.getAttribute('data-save'),m=byId(id),ta=$('#note-'+id),ng=S.admin?$('#grp-'+id).value:m.group,moved=ng!==m.group;
-    var nr=$('#role-'+id).value.trim(),changedRole=nr!==m.role;
-    var nn=ta.value.trim();if(LIVE_URL){if(nn!==(m.note||''))liveQueue({a:'note',ym:S.date.slice(0,7),name:m.name,note:nn});if(changedRole)liveQueue({a:'role',name:m.name,role:nr});if(moved)liveQueue({a:'move',name:m.name,to:ng,admin:adminCode()})}
+    var nr=$('#role-'+id).value.trim(),fromNew=moved&&m.group==='staff'&&ng!=='staff'&&m.role==='새가족';
+    if(fromNew&&nr==='새가족')nr='';   /* 11-26: 새가족을 셀로 보내면 서버가 명단에 '셀원'으로 넣어요. 화면에서도 새가족 표시를 지워요 */
+    var changedRole=nr!==m.role&&!(fromNew&&nr==='');
+    /* 셀 이동을 먼저 보내요: 새가족은 셀 명단에 들어간 뒤에야 역할을 바꿀 수 있어서 (순서가 반대면 서버가 역할 변경을 거절) */
+    var nn=ta.value.trim();if(LIVE_URL){if(moved)liveQueue({a:'move',name:m.name,to:ng,admin:adminCode()});if(changedRole)liveQueue({a:'role',name:m.name,role:nr});if(nn!==(m.note||''))liveQueue({a:'note',ym:S.date.slice(0,7),name:m.name,note:nn})}
     m.note=nn;if(moved)m.ord=nextOrd();m.group=ng;m.role=nr;
     syncLeaders();closeSheet();
     toast(moved?m.name+' 님을 '+withRo(gOf(ng).name)+' 옮겼어요':changedRole?m.name+' 님 역할을 '+(nr?withRo(nr)+' 바꿨어요':'셀원으로 바꿨어요'):m.name+' 님 정보를 저장했어요');
