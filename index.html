@@ -1070,14 +1070,14 @@ function enablePush(){
    앱을 열 때 이 폰의 임의 번호·내 셀·알림 허용 여부만 서버에 알려요(이름·연락처 없음). 숫자는 총무단 코드가 맞을 때만 받아요. */
 var DEV_KEY='saengmyeong-dev';
 function devId(){try{var v=localStorage.getItem(DEV_KEY);if(!v){v=Math.random().toString(36).slice(2,10)+Date.now().toString(36);localStorage.setItem(DEV_KEY,v)}return v}catch(e){return ''}}
-function sayHello(){if(!LIVE_URL||!passed())return;try{apiPost({a:'hello',code:entryCode(),dev:devId(),cell:myCell(),push:pushPerm()==='granted'}).catch(function(){})}catch(e){}}
+function sayHello(){if(!LIVE_URL||!passed())return;try{apiPost({a:'hello',code:entryCode(),dev:devId(),cell:myCell(),push:pushPerm()==='granted',standalone:isStandalone()}).catch(function(){})}catch(e){}}
 var DEV_ROWS=[['staff','총무단, 새가족'],['c1','1셀'],['c2','2셀'],['c3','3셀'],['c4','4셀'],['c5','5셀'],['c6','6셀'],['none','내 셀 안 고름']];
 function devStatsHTML(d){
   var c=d.cells,tn=0,tp=0;DEV_ROWS.forEach(function(r){tn+=c[r[0]].n;tp+=c[r[0]].p});
-  return '<ul class="sched devstats">'+DEV_ROWS.filter(function(r){return r[0]!=='none'||c.none.n}).map(function(r){var x=c[r[0]],g=gOf(r[0]);
-      return '<li><span>'+r[1]+(g&&g.leader?' <small>'+esc(g.leader)+'</small>':'')+'</span><span class="'+(x.n?'':'zero')+'">'+(x.n?'폰 '+x.n+'대 · 알림 '+x.p:'아직 없음')+'</span></li>'}).join('')+
-    '<li class="tot"><span>합계</span><span>폰 '+tn+'대 · 알림 '+tp+'</span></li></ul>'+
-    '<p class="note">최근 '+d.days+'일 안에 앱을 연 폰 수예요. 사람 수가 아니라 폰 수라서, 한 사람이 폰 두 대로 열면 2대로 세요. "알림"은 알림을 허용한 폰이에요.</p>';
+  return '<ul class="sched devstats">'+DEV_ROWS.filter(function(r){return r[0]!=='none'||c.none.n||c.none.p}).map(function(r){var x=c[r[0]],g=gOf(r[0]),any=x.n||x.p;
+      return '<li><span>'+r[1]+(g&&g.leader?' <small>'+esc(g.leader)+'</small>':'')+'</span><span class="'+(any?'':'zero')+'">'+(any?'설치 '+x.n+' · 알림 '+x.p:'아직 없음')+'</span></li>'}).join('')+
+    '<li class="tot"><span>합계</span><span>설치 '+tn+' · 알림 '+tp+'</span></li></ul>'+
+    '<p class="note">최근 '+d.days+'일 기준이에요. "설치"는 홈 화면 아이콘으로 앱을 연 폰 수(카톡·사파리·크롬 화면에서 연 건 빼고), "알림"은 알림을 허용한 폰 수예요. 이미 등록한 리더는 새 버전으로 앱을 한 번 더 열면 "설치"에 잡혀요.</p>';
 }
 function openDevStats(){
   openSheet('<h2>앱 등록 현황</h2><div id="devbox"><p class="empty">불러오는 중이에요…</p></div><div class="actions"><button type="button" class="btn" data-back-install>뒤로</button><button type="button" class="btn primary" data-close>닫기</button></div>');
