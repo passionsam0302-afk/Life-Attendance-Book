@@ -981,9 +981,31 @@ function renderPlist(){
 
 /* ---------- sheets ---------- */
 var scrim=$('#scrim'),sheet=$('#sheet');
-function openSheet(html){sheet.innerHTML='<div class="grab"></div>'+html;sheet.hidden=false;scrim.hidden=false}
-function closeSheet(){sheet.hidden=true;scrim.hidden=true;sheet.innerHTML=''}
-scrim.addEventListener('click',closeSheet);
+/* ---------- 뒤로가기 (11-26 사용자 요청) ----------
+   탭을 바꾸거나 창을 열 때 이동 기록을 남겨서, 뒤로가기 = 바로 전 화면(열린 창 닫기 → 전 탭).
+   맨 처음 화면에서 뒤로가기를 누르면 "한 번 더 누르면 앱이 종료돼요"를 3초 동안 띄우고, 그 안에 한 번 더 누르면 나가요.
+   기록 맨 아래에 'base'를 두고 그 위에 앱 화면들을 쌓아요. 뒤로가기로 base에 닿으면 = 처음 화면에서 뒤로가기. */
+var HIST={armed:false,t:null};
+function hPush(st){try{history.pushState(Object.assign({n:'app'},st),'')}catch(e){}}
+function hReplace(st){try{history.replaceState(Object.assign({n:'app'},st),'')}catch(e){}}
+function openSheet(html){var was=!sheet.hidden;sheet.innerHTML='<div class="grab"></div>'+html;sheet.hidden=false;scrim.hidden=false;if(!was)hPush({tab:S.tab,sheet:1})}
+function closeSheet(fromBack){sheet.hidden=true;scrim.hidden=true;sheet.innerHTML='';
+  if(!fromBack){var st=null;try{st=history.state}catch(e){}if(st&&st.sheet)hReplace({tab:S.tab})}}   /* 버튼으로 닫으면 창 기록을 지금 탭 기록으로 바꿔 둠 (뒤로가기 한 번이 헛돌면 아래에서 자동으로 한 칸 더) */
+window.addEventListener('popstate',function(e){
+  var st=e.state||{};
+  if(st.n==='base'){
+    if(!sheet.hidden){closeSheet(true);hPush({tab:S.tab});return}
+    if(S.tab!=='home'){go('home',true);hPush({tab:'home'});return}
+    if(HIST.armed){clearTimeout(HIST.t);HIST.armed=false;$('#toast').classList.remove('show');try{history.back()}catch(x){}return}   /* 두 번째: 앱 나가기 */
+    HIST.armed=true;toast('한 번 더 누르면 앱이 종료돼요');
+    HIST.t=setTimeout(function(){HIST.armed=false;$('#toast').classList.remove('show')},3000);
+    hPush({tab:'home'});return}
+  var wasSheet=!sheet.hidden;
+  if(wasSheet)closeSheet(true);
+  if(st.tab&&st.tab!==S.tab){go(st.tab,true);return}
+  if(!wasSheet){try{history.back()}catch(x){}}   /* 보이는 게 안 바뀌는 기록은 건너뛰기 */
+});
+scrim.addEventListener('click',function(){closeSheet()});
 document.addEventListener('keydown',function(e){if(e.key==='Escape'&&!sheet.hidden)closeSheet()});
 
 function openPerson(id){
@@ -1256,7 +1278,7 @@ main.addEventListener('input',function(e){
 $('#installBtn').addEventListener('click',openInstall);
 
 /* ---------- tabs ---------- */
-function go(tab){S.tab=tab;Array.prototype.forEach.call(document.querySelectorAll('.nav button'),function(b){if(b.getAttribute('data-tab')===tab)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')});render();window.scrollTo(0,0)}
+function go(tab,fromBack){if(!fromBack&&tab!==S.tab)hPush({tab:tab});S.tab=tab;Array.prototype.forEach.call(document.querySelectorAll('.nav button'),function(b){if(b.getAttribute('data-tab')===tab)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')});render();window.scrollTo(0,0)}
 /* 같은 탭을 다시 그릴 때는 칩 줄(가로 스크롤) 위치를 그대로 둬요 (11-25 사용자 요청) */
 var lastTab=null;
 function render(){if(LIVE_URL&&!liveReady()){liveEnsure();return}
@@ -1381,6 +1403,7 @@ $('#gateform').addEventListener('submit',function(e){
   apiGet({a:'ping',code:v}).then(function(res){if(res&&res.ok){err.textContent='';ok()}else bad('코드가 맞지 않아요. 다시 확인해 주세요.')},function(){bad('인터넷 연결을 확인해 주세요.')});
 });
 
+try{history.replaceState({n:'base'},'');history.pushState({n:'app',tab:S.tab},'')}catch(e){}   /* 뒤로가기 기록의 바닥 */
 if(!LIVE_URL)render();else if(passed())startApp();else main.innerHTML='<p class="empty">입장 코드를 넣으면 출석부를 불러와요.</p>';
 })();
 </script>
