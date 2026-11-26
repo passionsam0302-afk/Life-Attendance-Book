@@ -489,6 +489,13 @@ button{cursor:pointer}
   --b-site:#86D3A2; --b-online:#A3BEF0; --b-main:#E6BC62; --b-cell:#EAF3EC;
 }
 .wk .now{color:var(--leaf)}
+/* 출석 수정 권한 (11-26): 내 셀이 아닌 셀은 흐리게 */
+.group.ro .opt{opacity:.38}
+.group.ro .who{opacity:.75}
+.ro-tag{flex:none;font-size:11.5px;color:var(--ink-3);background:var(--surface-2);border-radius:999px;padding:3px 9px}
+.ro-note{display:flex;align-items:center;gap:10px;margin:12px 0 0;background:var(--gold-soft);color:var(--ink-2);border-radius:12px;padding:10px 12px;font-size:13px;line-height:1.45}
+.ro-note span{flex:1}
+.ro-note .mini{flex:none;background:var(--surface)}
 /* 총무단 도구 (11-25) */
 .devstats li{grid-template-columns:minmax(0,1fr) auto}
 .devstats li span:last-child{color:var(--ink);font-variant-numeric:tabular-nums}
@@ -838,7 +845,8 @@ function openAdminLogin(next){
   setTimeout(function(){var i=$('#admin-code');i&&i.focus()},60);
 }
 function adminCode(){try{return localStorage.getItem(ADMIN_KEY+'-code')||''}catch(e){return ''}}
-function setAdmin(on){S.admin=on;try{if(on)localStorage.setItem(ADMIN_KEY,'1');else localStorage.removeItem(ADMIN_KEY)}catch(e){}}
+function setAdmin(on){S.admin=on;try{if(on)localStorage.setItem(ADMIN_KEY,'1');else localStorage.removeItem(ADMIN_KEY)}catch(e){}
+  if(S.tab==='check'&&main.querySelector('#groups'))render()}   /* 출석 수정 권한이 바뀌니 출석 탭을 다시 그려요 */
 
 /* ---------- notifications: schedule + preview (real sending happens on the server) ---------- */
 function t2k(t){var h=+t.slice(0,2);return (h<12?'오전 ':'오후 ')+(h%12||12)+':'+t.slice(3)}
@@ -885,18 +893,24 @@ function renderCheck(){
   main.innerHTML=boardHTML()+
     '<div class="entry-h"><h2>'+md(S.date)+' '+KIND[kind]+'</h2><p>'+(S.date>TODAY?'미리 기록':S.date===TODAY?'오늘':'')+'</p></div>'+
     '<p style="margin:2px 0 0;font-size:12.5px;color:var(--ink-3)">'+(kind==='sun'?'예배는 셋 중 하나를 고르고, 셀모임은 따로 체크해요. 같은 버튼을 다시 누르면 지워져요.':'현장이나 온라인을 눌러 기록해요. 같은 버튼을 다시 누르면 지워져요.')+'</p>'+
+    (LIVE_URL&&!S.admin&&!myCell()?'<div class="ro-note"><span>지금은 보기만 할 수 있어요. 내 셀을 고르면 그 셀을 체크할 수 있어요.</span><button type="button" class="mini" data-mycell-open>내 셀 고르기</button></div>':'')+
     '<div class="search">'+ICON.search+'<input id="q" type="search" placeholder="이름 찾기" value="'+esc(S.q)+'" autocomplete="off" aria-label="이름 찾기"></div>'+
     '<div class="chips scrollx">'+chipHTML(S.group,'g')+'</div>'+
     '<div class="colhead"><span class="nmh">이름</span>'+headerCtl(kind)+'</div>'+
     '<div id="groups"></div>';
   renderGroups();
 }
+/* 출석·셀원 정보(역할, 기도제목·메모) 수정 권한 (11-26 사용자 결정): 총무단 모드 = 모든 셀, 리더 = 내 셀만, 내 셀을 안 고르면 보기만.
+   "내 셀"은 🔔에서 바꿀 수 있어서 실수로 남의 셀을 누르는 걸 막는 용도예요(서버는 막지 않음). 미리보기는 다 열어 둠. */
+function canEdit(gid){if(!LIVE_URL||S.admin)return true;var mc=myCell();return !!mc&&mc===gid}
+function roMsg(){return myCell()?'다른 셀은 보기만 할 수 있어요. 대신 체크가 필요하면 총무단에 말해 주세요':'내 셀을 고르면 체크할 수 있어요. 출석 탭 위의 “내 셀 고르기”를 눌러 주세요'}
 function groupMembers(gid){return orderMembers(M.filter(function(m){return m.group===gid&&(!S.q||m.name.indexOf(S.q)>-1)}))}
 function renderGroups(){
   var box=$('#groups');if(!box)return;var kind=kindOf(S.date),html='';
   GROUPS.forEach(function(g){if(S.group!=='all'&&g.id!==S.group)return;
     var ms=groupMembers(g.id);if(!ms.length)return;
-    html+='<section class="group" data-gsec="'+g.id+'"><div class="ghead"><h3>'+g.name+(g.leader?'<span>'+g.leader+'</span>':'')+'</h3><span class="gcount"></span>'+(kind==='sun'?'<button type="button" class="allbtn" data-allcell="'+g.id+'"></button>':'')+'</div>'+ms.map(function(m){return rowHTML(m,kind)}).join('')+'</section>'});
+    var ed=canEdit(g.id);
+    html+='<section class="group'+(ed?'':' ro')+'" data-gsec="'+g.id+'"><div class="ghead"><h3>'+g.name+(g.leader?'<span>'+g.leader+'</span>':'')+'</h3><span class="gcount"></span>'+(ed?(kind==='sun'?'<button type="button" class="allbtn" data-allcell="'+g.id+'"></button>':''):'<span class="ro-tag">보기만</span>')+'</div>'+ms.map(function(m){return rowHTML(m,kind)}).join('')+'</section>'});
   box.innerHTML=html||'<p class="empty">‘'+esc(S.q)+'’ 이름을 찾지 못했어요. 명단 탭에서 새로 추가할 수 있어요.</p>';
   updateHeads();
 }
@@ -973,7 +987,7 @@ scrim.addEventListener('click',closeSheet);
 document.addEventListener('keydown',function(e){if(e.key==='Escape'&&!sheet.hidden)closeSheet()});
 
 function openPerson(id){
-  var m=byId(id),g=gOf(m.group),ym=S.tab==='stats'?S.month:S.date.slice(0,7);
+  var m=byId(id),g=gOf(m.group),ed=canEdit(m.group),ym=S.tab==='stats'?S.month:S.date.slice(0,7);
   var ds=monthDays(ym).filter(function(d){return d<=TODAY&&(kindOf(d)!=='etc'||hasRec(d))});
   var rows=ds.map(function(d){var k=kindOf(d),r=rec(d,m.id),p='';
       if(k==='sun'){p+=r.svc?'<span class="pill '+r.svc+'">'+svcText('sun',r.svc)+'</span>':'<span class="pill">예배 없음</span>';p+=r.cell?'<span class="pill cell">셀모임</span>':''}
@@ -985,12 +999,13 @@ function openPerson(id){
       return '<div class="phone"><div><span>연락처</span><b>'+(p?esc(p):'미입력')+'</b></div>'+(p?'<a class="pbtn" href="tel:'+dg+'">전화</a><a class="pbtn" href="sms:'+dg+'">문자</a><button type="button" class="pbtn" data-copy="'+esc(p)+'">복사</button>':'')+'</div>'})()+
     '<div class="field"><label for="grp-'+m.id+'">소속 셀'+(S.admin?'':' <button type="button" class="linkbtn" data-unlock="'+m.id+'">총무단 코드로 바꾸기</button>')+'</label><select id="grp-'+m.id+'"'+(S.admin?'':' disabled')+'>'+GROUPS.map(function(x){return '<option value="'+x.id+'"'+(x.id===m.group?' selected':'')+'>'+x.name+(x.leader?' ('+x.leader+')':'')+'</option>'}).join('')+'</select></div>'+
     '<p style="font-size:12.5px;color:var(--ink-3);margin-top:6px">'+(S.admin?'셀을 바꾸면 새 셀 명단 맨 아래로 가고, 지금까지의 출석 기록은 그대로 따라가요.':'셀 이동은 총무단만 할 수 있어요.')+'</p>'+
-    '<div class="field"><label for="role-'+m.id+'">역할</label><input id="role-'+m.id+'" list="role-list" value="'+esc(m.role)+'" placeholder="비워두면 셀원" autocomplete="off">'+
-    '<div class="rolechips">'+ROLES.map(function(r){return '<button type="button" class="chip" data-role="'+r+'" data-for="role-'+m.id+'">'+r+'</button>'}).join('')+'</div>'+
+    (ed?'':'<p class="ro-note" style="margin-top:14px"><span>'+(myCell()?'다른 셀 사람이라 보기만 할 수 있어요. 역할·메모 수정은 그 셀 리더나 총무단이 해요.':'내 셀을 고르면 우리 셀 사람의 역할·메모를 고칠 수 있어요.')+'</span></p>')+
+    '<div class="field"><label for="role-'+m.id+'">역할</label><input id="role-'+m.id+'" list="role-list" value="'+esc(m.role)+'" placeholder="'+(ed?'비워두면 셀원':'셀원')+'" autocomplete="off"'+(ed?'':' readonly')+'>'+
+    (ed?'<div class="rolechips">'+ROLES.map(function(r){return '<button type="button" class="chip" data-role="'+r+'" data-for="role-'+m.id+'">'+r+'</button>'}).join('')+'</div>':'')+
     '<datalist id="role-list">'+ROLES.concat(['선임총무','서기','새가족총무','새가족부총무','회계']).map(function(r){return '<option value="'+r+'">'}).join('')+'</datalist></div>'+
-    '<div class="field"><label for="note-'+m.id+'">기도제목, 메모</label><textarea id="note-'+m.id+'" placeholder="함께 기도할 내용이나 메모를 적어주세요">'+esc(m.note)+'</textarea></div>'+
+    '<div class="field"><label for="note-'+m.id+'">기도제목, 메모</label><textarea id="note-'+m.id+'" placeholder="'+(ed?'함께 기도할 내용이나 메모를 적어주세요':'')+'"'+(ed?'':' readonly')+'>'+esc(m.note)+'</textarea></div>'+
     '<h3>'+Number(ym.slice(5))+'월 기록, '+monthCount(m,ym)+'회</h3><div class="rec">'+(rows||'<p>이 달에는 아직 기록이 없어요.</p>')+'</div>'+
-    '<div class="actions"><button type="button" class="btn" data-close>닫기</button><button type="button" class="btn primary" data-save="'+m.id+'">저장</button></div>');
+    '<div class="actions"><button type="button" class="btn'+(ed?'':' primary')+'" data-close>닫기</button>'+(ed?'<button type="button" class="btn primary" data-save="'+m.id+'">저장</button>':'')+'</div>');
 }
 /* 새 사람 추가의 역할 칸 (11-25): 셀이면 셀리더·부셀리더·봉사자(비우면 셀원), "총무단, 새가족"이면 새가족으로 고정
    (앱에서 추가한 사람은 명단의 새가족 시트로 들어가요. 총무단은 명단 시트에서 직접) */
@@ -1111,13 +1126,14 @@ sheet.addEventListener('click',function(e){
   if(t.hasAttribute('data-pushnow')){openPushNow();return}
   if(t.hasAttribute('data-back-install')){openInstall();return}
   if(t.hasAttribute('data-admin-toggle')){if(S.admin){setAdmin(false);toast('총무단 모드를 껐어요');openInstall();if(S.tab==='home')renderHome()}else openAdminLogin('settings');return}
-  if(t.hasAttribute('data-mycell')){try{localStorage.setItem(CELL_KEY,t.getAttribute('data-mycell'))}catch(err){}syncPushTags();sayHello();closeSheet();toast('내 셀을 '+withRo(myCellName())+' 정했어요');return}
+  if(t.hasAttribute('data-mycell')){try{localStorage.setItem(CELL_KEY,t.getAttribute('data-mycell'))}catch(err){}syncPushTags();sayHello();closeSheet();if(S.tab==='check')render();toast('내 셀을 '+withRo(myCellName())+' 정했어요');return}
   if(t.hasAttribute('data-mycell-open')){askMyCell(true);return}
   if(t.hasAttribute('data-unlock')){openAdminLogin('person:'+t.getAttribute('data-unlock'));return}
   if(t.hasAttribute('data-copy')){var num=t.getAttribute('data-copy');
     try{navigator.clipboard.writeText(num).then(function(){toast('번호를 복사했어요')},function(){selNum()})}catch(err){selNum()}
     return}
   if(t.hasAttribute('data-role')){var inp=$('#'+t.getAttribute('data-for'));var r0=t.getAttribute('data-role');inp.value=inp.value.trim()===r0?'':r0;return}
+  if(t.hasAttribute('data-save')&&!canEdit((byId(t.getAttribute('data-save'))||{}).group)){toast(roMsg());closeSheet();return}
   if(t.hasAttribute('data-save')){var id=t.getAttribute('data-save'),m=byId(id),ta=$('#note-'+id),ng=S.admin?$('#grp-'+id).value:m.group,moved=ng!==m.group;
     var nr=$('#role-'+id).value.trim(),changedRole=nr!==m.role;
     var nn=ta.value.trim();if(LIVE_URL){if(nn!==(m.note||''))liveQueue({a:'note',ym:S.date.slice(0,7),name:m.name,note:nn});if(changedRole)liveQueue({a:'role',name:m.name,role:nr});if(moved)liveQueue({a:'move',name:m.name,to:ng,admin:adminCode()})}
@@ -1187,6 +1203,9 @@ function toast(msg,undo){var t=$('#toast');t.innerHTML='<span>'+msg+'</span>'+(u
 main.addEventListener('click',function(e){
   var t=e.target.closest('button');if(!t||t.disabled)return;
   if((t.hasAttribute('data-svc')||t.hasAttribute('data-cell')||t.hasAttribute('data-allcell'))&&!liveDateOk(S.date)){toast('이 날짜는 출석부에 칸이 없어요. 금요철야와 주일예배만 기록할 수 있어요');return}
+  if(t.hasAttribute('data-svc')||t.hasAttribute('data-cell')||t.hasAttribute('data-allcell')){
+    var gk=t.getAttribute('data-allcell')||((byId(t.getAttribute('data-id'))||{}).group);if(!canEdit(gk)){toast(roMsg());return}}
+  if(t.hasAttribute('data-mycell-open')){askMyCell(true);return}
   if(t.hasAttribute('data-svc')){
     var id=t.getAttribute('data-id'),v=t.getAttribute('data-svc'),cur=rec(S.date,id).svc;
     put(S.date,id,{svc:cur===v?null:v});lastOwn=Date.now();updateRow(id);afterChange();return}
